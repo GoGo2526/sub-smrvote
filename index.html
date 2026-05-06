@@ -1,0 +1,1713 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>馬頭涌官立小學 投票系統</title>
+  
+  <!-- 載入 Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- 載入 html2pdf 以生成 PDF 檔案 -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  
+  <!-- 載入 React & ReactDOM -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <!-- 載入 Firebase (v10 compat) 以支援跨裝置即時更新 -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-auth-compat.js"></script>
+</head>
+<body class="bg-slate-50 text-slate-900 font-sans selection:bg-blue-100">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useMemo } = React;
+
+    // ==========================================
+    // [設定區] Firebase 即時資料庫設定
+    // 若要部署到 GitHub Pages 並啟用多裝置「即時更新」，請將您的 Firebase Config 貼在這裡。
+    // ==========================================
+    const FIREBASE_CONFIG = {
+      apiKey: "AIzaSyAZcdffxi05CN4e9Huxl0poO6CGBPZgIkk",
+      authDomain: "mtc-vote.firebaseapp.com",
+      projectId: "mtc-vote",
+      storageBucket: "mtc-vote.firebasestorage.app",
+      messagingSenderId: "228803343176",
+      appId: "1:228803343176:web:1235008cc155d359bff97d",
+      measurementId: "G-MMG3S60X2K"
+    };
+
+    // --- 圖示元件 ---
+    const Icon = ({ name, className = "w-5 h-5" }) => {
+      const svgProps = { className, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" };
+      switch (name) {
+        case 'Users': return <svg {...svgProps}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>;
+        case 'Settings': return <svg {...svgProps}><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>;
+        case 'Clock': return <svg {...svgProps}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>;
+        case 'Download': return <svg {...svgProps}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>;
+        case 'Printer': return <svg {...svgProps}><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>;
+        case 'Lock': return <svg {...svgProps}><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>;
+        case 'Key': return <svg {...svgProps}><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>;
+        case 'Plus': return <svg {...svgProps}><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>;
+        case 'Trash2': return <svg {...svgProps}><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>;
+        case 'CheckCircle2': return <svg {...svgProps}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>;
+        case 'QrCode': return <svg {...svgProps}><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>;
+        case 'LogOut': return <svg {...svgProps}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>;
+        case 'ArrowRight': return <svg {...svgProps}><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>;
+        case 'AlertCircle': return <svg {...svgProps}><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>;
+        default: return null;
+      }
+    };
+
+    // --- 共用 UI 元件 ---
+    const Card = ({ children, className = '' }) => (
+      <div className={`bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden ${className}`}>
+        {children}
+      </div>
+    );
+
+    const Button = ({ children, onClick, variant = 'primary', className = '', disabled = false, type = 'button' }) => {
+      const baseStyle = "inline-flex items-center justify-center px-4 py-2 rounded-lg font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed";
+      const variants = {
+        primary: "bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500",
+        secondary: "bg-slate-100 text-slate-700 hover:bg-slate-200 focus:ring-slate-500",
+        danger: "bg-red-50 text-red-600 hover:bg-red-100 focus:ring-red-500",
+        outline: "border border-slate-300 text-slate-700 hover:bg-slate-50 focus:ring-blue-500",
+        success: "bg-green-700 text-white hover:bg-green-800 focus:ring-green-600"
+      };
+      return (
+        <button type={type} onClick={onClick} disabled={disabled} className={`${baseStyle} ${variants[variant]} ${className}`}>
+          {children}
+        </button>
+      );
+    };
+
+    const Input = ({ label, type = 'text', value, onChange, onBlur, placeholder, required = false, min, className = '', disabled = false, autoFocus = false }) => (
+      <div className={`flex flex-col gap-1.5 w-full ${className}`}>
+        {label && <label className="text-sm font-medium text-slate-700">{label} {required && <span className="text-red-500">*</span>}</label>}
+        <input
+          type={type}
+          value={value}
+          onChange={onChange}
+          onBlur={onBlur}
+          placeholder={placeholder}
+          required={required}
+          min={min}
+          disabled={disabled}
+          autoFocus={autoFocus}
+          className={`w-full min-w-0 px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow appearance-none ${disabled ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : ''}`}
+        />
+      </div>
+    );
+
+    // --- 自訂 Hook: 即時同步狀態 ---
+    const INITIAL_STATE = {
+      systemState: 'setup', 
+      startTime: '', 
+      endTime: '',
+      adminPassword: '',
+      forceLogoutKey: null, // 用於超級管理員強制其他裝置登出的標記
+      maxOpenPolls: 0, 
+      isResultsPublished: false, 
+      actualDistributedCodes: '', // 記錄實際派發的選票數量
+      ballotRemark: '請於投票當日登入學校網站,掃描二維碼,並輸入校方提供的6位數密碼進行投票,結果將會在投票截止後隨即公佈.',
+      polls: [
+        { id: '1', title: '2026年度最佳員工選舉', options: [{ id: 'o1', text: '陳大文' }, { id: 'o2', text: '李小明' }], maxSelect: 1, status: 'active', isVisible: true, isLocked: false },
+        { id: '2', title: '公司下一季旅遊地點（多選）', options: [{ id: 'o3', text: '日本東京' }, { id: 'o4', text: '韓國首爾' }, { id: 'o5', text: '泰國曼谷' }], maxSelect: 2, status: 'active', isVisible: true, isLocked: false }
+      ],
+      voterCodes: [] 
+    };
+
+    const useSyncState = () => {
+      const [state, setState] = useState(INITIAL_STATE);
+      const [dbRef, setDbRef] = useState(null);
+      const [user, setUser] = useState(null);
+
+      useEffect(() => {
+        let config = FIREBASE_CONFIG;
+        let isUsingCanvasConfig = false;
+        
+        if ((!config || !config.apiKey) && typeof __firebase_config !== 'undefined') {
+          config = typeof __firebase_config === 'string' ? JSON.parse(__firebase_config) : __firebase_config;
+          isUsingCanvasConfig = true;
+        }
+
+        if (!config || !config.apiKey) return; 
+
+        if (!firebase.apps.length) {
+          firebase.initializeApp(config);
+        }
+        const auth = firebase.auth();
+
+        const initAuth = async () => {
+          try {
+            let token = (isUsingCanvasConfig && typeof __initial_auth_token !== 'undefined') ? __initial_auth_token : null;
+            if (token) {
+              await auth.signInWithCustomToken(token);
+            } else {
+              await auth.signInAnonymously();
+            }
+          } catch (authErr) {
+            console.error("Auth error:", authErr);
+            window.dispatchEvent(new CustomEvent('firebase-error', { detail: '登入失敗：請確保在 Firebase 控制台已開啟「匿名登入(Anonymous)」功能。' }));
+          }
+        };
+        initAuth();
+
+        const unsubscribe = auth.onAuthStateChanged((u) => {
+          setUser(u);
+        });
+
+        return () => unsubscribe();
+      }, []);
+
+      useEffect(() => {
+        if (!user) return;
+
+        const db = firebase.firestore();
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'mty-voting-app';
+        const ref = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('votes').doc('main_state');
+        setDbRef(ref);
+
+        const unsubscribe = ref.onSnapshot(
+          doc => {
+            if (doc.exists) {
+              setState(doc.data());
+            } else {
+              ref.set(INITIAL_STATE).catch(err => {
+                console.error("Initial set failed:", err);
+                if (err.code === 'permission-denied') {
+                  window.dispatchEvent(new CustomEvent('firebase-error', { detail: 'Firestore 權限遭拒：請進入 Firebase 控制台，將資料庫規則 (Rules) 改為測試模式 (allow read, write: if true)。' }));
+                }
+              });
+            }
+          },
+          err => {
+            console.error("Snapshot error:", err);
+            if (err.code === 'permission-denied') {
+              window.dispatchEvent(new CustomEvent('firebase-error', { detail: 'Firestore 權限遭拒：請進入 Firebase 控制台，將資料庫規則 (Rules) 改為測試模式 (allow read, write: if true)。' }));
+            }
+          }
+        );
+
+        return () => unsubscribe();
+      }, [user]);
+
+      const setSyncState = (newState) => {
+        setState(newState);
+        if (dbRef) {
+          dbRef.set(newState, { merge: true }).catch(err => {
+             console.error("Update failed:", err);
+             if (err.code === 'permission-denied') {
+                window.dispatchEvent(new CustomEvent('firebase-error', { detail: '儲存失敗：Firestore 權限不足，請檢查您的資料庫安全性規則。' }));
+             }
+          });
+        }
+      };
+
+      return [state, setSyncState];
+    };
+
+
+    // --- 主應用程式 ---
+    function App() {
+      const [appData, setAppData] = useSyncState();
+      const [currentView, setCurrentView] = useState(() => {
+        // 若網址包含 view=voter，則直接進入投票站 (供 QRCode 使用)
+        if (typeof window !== 'undefined' && window.location.search.includes('view=voter')) return 'voter';
+        return 'home';
+      });
+      const [toast, setToast] = useState(null);
+      const [currentVoterCode, setCurrentVoterCode] = useState(() => sessionStorage.getItem('currentVoterCode') || null);
+      
+      // 管理員登入狀態 (null, 'admin', 'superadmin')
+      const [adminRole, setAdminRole] = useState(() => sessionStorage.getItem('adminRole') || null);
+      const [adminLoginInput, setAdminLoginInput] = useState('');
+      
+      // 追蹤上一次的強制登出金鑰
+      const [lastLogoutKey, setLastLogoutKey] = useState(appData?.forceLogoutKey);
+
+      // 共用的 Modal (用於首層級別的登出/重設確認)
+      const [appModal, setAppModal] = useState({ isOpen: false, type: '', title: '', message: '' });
+
+      const showToast = (msg, type = 'info') => {
+        setToast({ msg, type });
+        setTimeout(() => setToast(null), 3000);
+      };
+
+      const updateData = (updates) => {
+        setAppData({ ...appData, ...updates });
+      };
+
+      // 儲存登入狀態至 Session Storage 防止重新整理後登出
+      useEffect(() => {
+        if (adminRole) sessionStorage.setItem('adminRole', adminRole);
+        else sessionStorage.removeItem('adminRole');
+      }, [adminRole]);
+
+      useEffect(() => {
+        if (currentVoterCode) sessionStorage.setItem('currentVoterCode', currentVoterCode);
+        else sessionStorage.removeItem('currentVoterCode');
+      }, [currentVoterCode]);
+
+      // 監聽 Firebase 權限錯誤並顯示通知
+      useEffect(() => {
+        const handleFirebaseError = (e) => {
+          showToast(e.detail || 'Firebase 連線發生錯誤，請檢查設定。', 'error');
+        };
+        window.addEventListener('firebase-error', handleFirebaseError);
+        return () => window.removeEventListener('firebase-error', handleFirebaseError);
+      }, []);
+
+      // 監聽超級管理員的強制登出訊號
+      useEffect(() => {
+        if (appData?.forceLogoutKey && appData.forceLogoutKey !== lastLogoutKey) {
+          if (adminRole === 'admin') {
+            setAdminRole(null);
+            setCurrentView('home');
+            showToast('超級管理員已重設系統並強制登出所有帳戶。', 'error');
+          }
+          setLastLogoutKey(appData.forceLogoutKey);
+        }
+      }, [appData?.forceLogoutKey, lastLogoutKey, adminRole]);
+
+      // 處理登出點擊
+      const handleLogoutClick = () => {
+        if (adminRole === 'superadmin') {
+          setAppModal({
+            isOpen: true,
+            type: 'superAdminLogout',
+            title: '超級管理員登出及重設',
+            message: '這將會強制清除所有投票資料並將所有管理員帳戶全部登出。確定執行？'
+          });
+        } else {
+          setAdminRole(null);
+          setCurrentView('home');
+          showToast('管理員已登出', 'info');
+        }
+      };
+
+      const handleAppModalConfirm = (e) => {
+        e.preventDefault();
+        if (appModal.type === 'superAdminLogout') {
+          updateData({ ...INITIAL_STATE, forceLogoutKey: Date.now() });
+          setAdminRole(null);
+          setCurrentView('home');
+          showToast('已清除所有資料並強制登出所有管理員。', 'success');
+        }
+        setAppModal({ isOpen: false, type: '', title: '', message: '' });
+      };
+
+      return (
+        <div className="min-h-screen bg-slate-50 text-slate-900 font-sans selection:bg-blue-100">
+          <nav className="bg-white border-b border-slate-200 px-3 sm:px-6 py-3 sticky top-0 z-50 print:hidden shadow-sm">
+            <div className="max-w-5xl mx-auto flex flex-row items-center justify-between gap-2">
+              <div className="flex items-center gap-2 cursor-pointer shrink-0" onClick={() => setCurrentView('home')}>
+                <div className="w-7 h-7 sm:w-8 sm:h-8 bg-blue-600 rounded-lg flex items-center justify-center shrink-0">
+                  <Icon name="CheckCircle2" className="text-white w-4 h-4 sm:w-5 sm:h-5" />
+                </div>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:gap-2 leading-tight">
+                  <span className="font-bold text-[15px] sm:text-xl tracking-tight leading-none">馬頭涌官立小學</span>
+                  <span className="font-bold text-[15px] sm:text-xl tracking-tight leading-none mt-1 sm:mt-0">投票系統</span>
+                </div>
+              </div>
+              <div className="flex gap-1.5 sm:gap-2 shrink-0">
+                { (currentView !== 'voter' || adminRole) && (
+                  <Button variant="secondary" className="text-xs sm:text-sm px-2.5 py-1.5 sm:px-4 sm:py-2" onClick={() => setCurrentView('admin')}>
+                    <span className="sm:hidden">系統</span>
+                    <span className="hidden sm:inline">系統設定</span>
+                  </Button>
+                )}
+                <Button variant="primary" className="text-xs sm:text-sm px-2.5 py-1.5 sm:px-4 sm:py-2" onClick={() => setCurrentView('voter')}>
+                  投票站
+                </Button>
+                {adminRole && (
+                  <button 
+                    className={`inline-flex items-center justify-center px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg font-bold transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 text-xs sm:text-sm text-white shrink-0 shadow-sm ${
+                      adminRole === 'superadmin' 
+                        ? 'bg-red-800 hover:bg-red-900 focus:ring-red-700' 
+                        : 'bg-green-600 hover:bg-green-700 focus:ring-green-500'
+                    }`}
+                    onClick={handleLogoutClick}
+                  >
+                    <Icon name="LogOut" className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+                    <span className="hidden sm:inline">{adminRole === 'superadmin' ? '登出(超級管理員)' : '登出(管理員)'}</span>
+                    <span className="sm:hidden">登出</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          </nav>
+
+          {toast && (
+            <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[100] animate-in fade-in slide-in-from-top-4 print:hidden">
+              <div className={`px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 text-white font-medium ${toast.type === 'error' ? 'bg-red-600' : 'bg-slate-800'}`}>
+                <Icon name={toast.type === 'error' ? 'AlertCircle' : 'CheckCircle2'} className="w-5 h-5" />
+                {toast.msg}
+              </div>
+            </div>
+          )}
+
+          {appModal.isOpen && (
+            <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm print:hidden">
+              <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm m-4 animate-in fade-in zoom-in-95">
+                <h3 className="text-xl font-bold mb-2">{appModal.title}</h3>
+                <p className="text-slate-600 mb-6 text-sm">{appModal.message}</p>
+                <form onSubmit={handleAppModalConfirm} className="space-y-4">
+                  <div className="flex gap-3 justify-end mt-6">
+                    <Button variant="secondary" onClick={() => setAppModal({ ...appModal, isOpen: false })} type="button">取消</Button>
+                    <Button variant="danger" type="submit">確認</Button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          <main className="max-w-5xl mx-auto p-6 min-h-[calc(100vh-73px)] print:p-0 print:m-0">
+            {currentView === 'home' && (
+              <div className="flex flex-col items-center justify-center h-[60vh] text-center space-y-6">
+                <h2 className="text-4xl font-extrabold text-slate-800 leading-tight">
+                  <span className="block pb-4">歡迎使用</span>
+                  <span className="block sm:inline">馬頭涌官立小學</span>
+                  <span className="block sm:inline sm:ml-2">(投票系統)</span>
+                </h2>
+                <div className="flex gap-4 pt-4">
+                  <Button onClick={() => setCurrentView('admin')} className="px-8 py-4 text-lg">系統管理員</Button>
+                  <Button variant="outline" onClick={() => setCurrentView('voter')} className="px-8 py-4 text-lg bg-white">前往投票站</Button>
+                </div>
+              </div>
+            )}
+
+            {currentView === 'admin' && !adminRole && (
+              <div className="flex flex-col items-center justify-center h-[50vh]">
+                <Card className="p-8 max-w-sm w-full text-center shadow-lg border-t-4 border-t-slate-800">
+                  <Icon name="Lock" className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+                  <h3 className="text-xl font-bold mb-6 text-slate-800">系統管理員登入</h3>
+                  <form onSubmit={(e) => {
+                    e.preventDefault();
+                    // 透過數學字元偏移(Shift+3)進行前端混淆驗證，避免密碼明文暴露
+                    const obfuscatedInput = adminLoginInput.trim().split('').map(c => String.fromCharCode(c.charCodeAt(0) + 3)).join('');
+                    if (obfuscatedInput === 'Pwf05859') { // 對應管理員密碼
+                      setAdminRole('admin');
+                      setAdminLoginInput('');
+                    } else if (obfuscatedInput === 'Pwf0593;') { // 對應超級管理員密碼
+                      setAdminRole('superadmin');
+                      setAdminLoginInput('');
+                      showToast('已登入為超級管理員', 'success');
+                    } else {
+                      showToast('密碼錯誤，請重新輸入', 'error');
+                    }
+                  }} className="space-y-4">
+                    <input
+                      type="password"
+                      placeholder="請輸入管理員密碼"
+                      value={adminLoginInput}
+                      onChange={(e) => setAdminLoginInput(e.target.value)}
+                      className="w-full text-center px-4 py-3 border-2 border-slate-300 rounded-lg focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all"
+                    />
+                    <Button type="submit" className="w-full py-3 text-lg">
+                      確認登入
+                    </Button>
+                  </form>
+                </Card>
+              </div>
+            )}
+
+            {currentView === 'admin' && adminRole && (
+              <AdminDashboard 
+                appData={appData} 
+                updateData={updateData}
+                showToast={showToast}
+                INITIAL_STATE={INITIAL_STATE}
+                adminRole={adminRole}
+                onSuperAdminReset={() => {
+                  updateData({ ...INITIAL_STATE, forceLogoutKey: Date.now() });
+                  setAdminRole(null);
+                  setCurrentView('home');
+                  showToast('已清除所有資料並強制登出所有管理員。', 'success');
+                }}
+              />
+            )}
+
+            {currentView === 'voter' && (
+              <VoterInterface 
+                appData={appData}
+                updateData={updateData}
+                currentVoterCode={currentVoterCode}
+                setCurrentVoterCode={setCurrentVoterCode}
+                showToast={showToast}
+              />
+            )}
+          </main>
+        </div>
+      );
+    }
+
+    // --- 主辦方元件 ---
+    function AdminDashboard({ appData, updateData, showToast, INITIAL_STATE, adminRole, onSuperAdminReset }) {
+      const { systemState, polls, voterCodes, startTime, endTime, adminPassword, maxOpenPolls } = appData;
+      const [numCodesToGenerate, setNumCodesToGenerate] = useState(10);
+      const [activeTab, setActiveTab] = useState('setup');
+      const [isUnlocked, setIsUnlocked] = useState(false);
+      const [unlockPassword, setUnlockPassword] = useState('');
+      const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+      
+      const [modalConfig, setModalConfig] = useState({ isOpen: false, type: '', payload: null, title: '', message: '', requirePwd: false });
+      const [modalInput, setModalInput] = useState('');
+
+      useEffect(() => {
+        if (systemState === 'active') setActiveTab('active');
+        if (systemState === 'ended') setActiveTab('results');
+      }, [systemState]);
+
+      const generateRandomCode = () => Math.random().toString(36).substring(2, 8).toUpperCase();
+
+      const openModal = (config) => {
+        setModalConfig({ ...config, isOpen: true });
+        setModalInput('');
+      };
+
+      const closeModal = () => {
+        setModalConfig({ isOpen: false, type: '', payload: null, title: '', message: '', requirePwd: false });
+      };
+
+      const handleModalConfirm = (e) => {
+        if (e) e.preventDefault();
+        const { type, payload, requirePwd } = modalConfig;
+
+        // 使用數學字元偏移(Shift+3)進行混淆驗證
+        const obfuscatedInput = modalInput.trim().split('').map(c => String.fromCharCode(c.charCodeAt(0) + 3)).join('');
+        if (requirePwd && obfuscatedInput !== 'Pwf05859') { // 對應管理員密碼
+          showToast('密碼錯誤！', 'error');
+          return;
+        }
+
+        if (type === 'superReset') {
+          onSuperAdminReset();
+        } else if (type === 'resetSystem') {
+          updateData(INITIAL_STATE);
+          showToast('系統已完全重新設定。', 'success');
+        } else if (type === 'unlockPoll') {
+          const newPolls = [...polls];
+          newPolls[payload.index].isLocked = false;
+          updateData({ polls: newPolls });
+          showToast('已解除鎖定，可進行修改。', 'success');
+        } else if (type === 'resetPollData') {
+          handleResetPoll(payload.id);
+        } else if (type === 'resetAllPolls') {
+          const newCodes = voterCodes.map(c => ({ ...c, used: false, votes: {}, usedAt: null }));
+          const newPolls = polls.map(p => ({ ...p, status: 'active' }));
+          updateData({ voterCodes: newCodes, polls: newPolls });
+          showToast('已清除並重設所有投票數據');
+        }
+
+        closeModal();
+      };
+
+      const handleStartVoting = () => {
+        if (polls.length === 0 || polls.some(p => p.options.length < 2)) {
+          return showToast('請確保有至少一個投票主題，且每個主題有至少兩個選項。', 'error');
+        }
+        
+        const visiblePolls = polls.filter(p => p.isVisible !== false);
+        if (visiblePolls.some(p => !p.isLocked)) {
+          return showToast('有顯示中的投票主題尚未「完成設定」，請先鎖定設定才能開始投票。', 'error');
+        }
+
+        if (!startTime || !endTime) return showToast('請設定投票開始與截止時間。', 'error');
+        if (!appData.actualDistributedCodes || parseInt(appData.actualDistributedCodes) <= 0) return showToast('請填寫實際派發選票數量。', 'error');
+        if (!adminPassword) return showToast('請設定解鎖結果用的密碼。', 'error');
+        
+        const codesToGen = parseInt(numCodesToGenerate) || 0;
+        let newCodes = voterCodes;
+        if (voterCodes.length !== codesToGen) {
+          newCodes = [];
+          for (let i = 0; i < codesToGen; i++) {
+            newCodes.push({ code: generateRandomCode(), used: false, votes: {}, usedAt: null });
+          }
+        }
+        
+        updateData({ voterCodes: newCodes, systemState: 'active' });
+        showToast('投票已正式啟動！');
+      };
+
+      const handleEndVoting = () => {
+        const newPolls = polls.map(p => ({ ...p, status: 'ended' }));
+        updateData({ systemState: 'ended', polls: newPolls });
+        showToast('投票已手動結束。');
+      };
+
+      const handleUnlock = (e) => {
+        e.preventDefault();
+        if (unlockPassword === adminPassword) {
+          setIsUnlocked(true);
+          showToast('結果已解鎖！');
+        } else {
+          showToast('密碼錯誤！', 'error');
+        }
+      };
+
+      const handleResetSystem = () => {
+        if (adminRole === 'superadmin') {
+          openModal({
+            type: 'superReset',
+            title: '超級管理員重設系統',
+            message: '這將會強制清除所有投票資料並將所有管理員帳戶全部登出。確定執行？',
+            requirePwd: false
+          });
+        } else {
+          openModal({
+            type: 'resetSystem',
+            title: '確認重新設定系統',
+            message: '請輸入管理員密碼以確認重新設定整個系統：',
+            requirePwd: true
+          });
+        }
+      };
+
+      const handleTogglePollStatus = (id) => {
+        const isTimeEnded = endTime && new Date().getTime() > new Date(endTime).getTime();
+        if (isTimeEnded) {
+          return showToast('投票時間已結束，不能更改狀態。', 'error');
+        }
+        const targetPoll = polls.find(p => p.id === id);
+        const newStatus = targetPoll.status === 'active' ? 'ended' : 'active';
+        const newPolls = polls.map(p => p.id === id ? { ...p, status: newStatus } : p);
+        
+        let updates = { polls: newPolls };
+        // 若重新開放投票主題，且整個系統狀態處於已結束，則同時喚醒系統為開放中
+        if (newStatus === 'active' && systemState === 'ended') {
+          updates.systemState = 'active';
+        }
+        
+        updateData(updates);
+        showToast('投票主題狀態已更新');
+      };
+
+      const handleResetPoll = (id) => {
+        const newCodes = voterCodes.map(c => {
+          if (c.votes && c.votes[id]) {
+            const newVotes = { ...c.votes };
+            delete newVotes[id];
+            return { ...c, votes: newVotes, used: Object.keys(newVotes).length > 0 };
+          }
+          return c;
+        });
+        const newPolls = polls.map(p => p.id === id ? { ...p, status: 'active' } : p);
+        updateData({ voterCodes: newCodes, polls: newPolls });
+        showToast('已重設此投票主題的所有數據');
+      };
+
+      const handleEndAllPolls = () => {
+        const newPolls = polls.map(p => ({ ...p, status: 'ended' }));
+        updateData({ polls: newPolls });
+        showToast('已結束所有投票主題');
+      };
+
+      const handleResetAllPolls = () => {
+        openModal({
+          type: 'resetAllPolls',
+          title: '重設所有投票數據',
+          message: '警告：這將會清除目前所有的投票記錄！確定要重設嗎？',
+          requirePwd: false
+        });
+      };
+
+      const handleExportPasswordsCSV = () => {
+        let csv = '\uFEFF通行碼,狀態\n';
+        voterCodes.forEach(c => {
+          csv += `"${c.code}","${c.used ? '已使用' : '未使用'}"\n`;
+        });
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'voter_codes.csv';
+        link.click();
+      };
+
+      const formatTime = (timeStr) => {
+        if (!timeStr) return '';
+        const d = new Date(timeStr);
+        return `${d.getFullYear()}年${String(d.getMonth()+1).padStart(2,'0')}月${String(d.getDate()).padStart(2,'0')}日 ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+      };
+
+      const handleGenerateBallotsPDF = () => {
+        if (!startTime || !endTime) {
+          return showToast('請先設定投票開始及截止時間', 'error');
+        }
+        if (polls.length === 0) {
+          return showToast('請先新增投票主題', 'error');
+        }
+
+        const visiblePolls = polls.filter(p => p.isVisible !== false);
+        if (visiblePolls.some(p => !p.isLocked)) {
+          return showToast('有顯示中的投票主題尚未「完成設定」，請先鎖定設定才能生成選票。', 'error');
+        }
+
+        const codesToGen = parseInt(numCodesToGenerate) || 0;
+        let currentCodes = voterCodes;
+        if (currentCodes.length !== codesToGen) {
+          currentCodes = [];
+          for (let i = 0; i < codesToGen; i++) {
+            currentCodes.push({ code: generateRandomCode(), used: false, votes: {}, usedAt: null });
+          }
+          updateData({ voterCodes: currentCodes });
+        }
+
+        setIsGeneratingPDF(true);
+        showToast('正在產生 PDF，請稍候...');
+
+        setTimeout(() => {
+          const element = document.getElementById('ballot-pdf-container');
+          if (!element) {
+            setIsGeneratingPDF(false);
+            return showToast('產生 PDF 失敗，找不到版面元素', 'error');
+          }
+          
+          const today = new Date();
+          const dateStr = today.getFullYear() + String(today.getMonth() + 1).padStart(2, '0') + String(today.getDate()).padStart(2, '0');
+          
+          const opt = {
+            margin:       0,
+            filename:     `馬頭涌官立小學-生成選票-${dateStr}.pdf`,
+            image:        { type: 'jpeg', quality: 0.98 },
+            html2canvas:  { scale: 2, useCORS: true, scrollY: 0 },
+            jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
+            pagebreak:    { mode: 'css' }
+          };
+
+          html2pdf().set(opt).from(element).save().then(() => {
+            setIsGeneratingPDF(false);
+            showToast('選票已成功生成為 PDF 檔案！', 'success');
+          }).catch(err => {
+            console.error('PDF Export Error:', err);
+            setIsGeneratingPDF(false);
+            showToast('生成選票發生錯誤，請稍後再試', 'error');
+          });
+        }, 800); 
+      };
+
+      const pdfPages = [];
+      for (let i = 0; i < voterCodes.length; i += 4) {
+        pdfPages.push(voterCodes.slice(i, i + 4));
+      }
+
+      // --- 防弊：計算有效的投票紀錄 ---
+      const actualCount = parseInt(appData.actualDistributedCodes) || voterCodes.length;
+      const usedCodes = voterCodes.filter(c => c.used);
+      // 以提交時間(usedAt)排列先後次序，若無則排最前
+      usedCodes.sort((a, b) => (a.usedAt || 0) - (b.usedAt || 0));
+      const excessCount = usedCodes.length - actualCount;
+      const validUsedCodes = excessCount > 0 ? usedCodes.slice(0, actualCount) : usedCodes;
+
+      return (
+        <div className="space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between print:hidden gap-4 w-full">
+            <div className="flex flex-wrap items-center justify-between sm:justify-start gap-3 w-full sm:w-auto">
+              <h2 className="text-xl sm:text-2xl font-bold flex items-center gap-2 shrink-0">
+                <Icon name="Settings" className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" /> 投票系統設定
+              </h2>
+              <Button variant="danger" className="text-sm py-1.5 px-3 shrink-0" onClick={handleResetSystem}>重新設定</Button>
+            </div>
+            <div className="flex gap-2 bg-slate-200 p-1 rounded-lg self-start sm:self-auto flex-wrap sm:flex-nowrap w-full sm:w-auto">
+              <button className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors grow sm:grow-0 ${activeTab === 'setup' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-600 hover:bg-slate-300'}`} onClick={() => setActiveTab('setup')}>
+                <span className="sm:hidden">設定</span><span className="hidden sm:inline">1. 初始設定</span>
+              </button>
+              <button className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors grow sm:grow-0 ${activeTab === 'active' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-600 hover:bg-slate-300'}`} onClick={() => setActiveTab('active')} disabled={systemState === 'setup'}>
+                <span className="sm:hidden">投票進行中</span><span className="hidden sm:inline">2. 投票進行中</span>
+              </button>
+              <button className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors grow sm:grow-0 ${activeTab === 'results' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-600 hover:bg-slate-300'}`} onClick={() => setActiveTab('results')} disabled={systemState === 'setup'}>
+                <span className="sm:hidden">投票結果</span><span className="hidden sm:inline">3. 結果與報告</span>
+              </button>
+            </div>
+          </div>
+
+          {activeTab === 'setup' && (
+            <div className="grid md:grid-cols-3 gap-6">
+              <div className="md:col-span-2 space-y-6">
+                {polls.map((poll, index) => (
+                  <Card key={poll.id} className="p-5">
+                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start mb-4 gap-3">
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full">
+                        <div className="flex justify-between w-full sm:w-auto items-center">
+                          <h3 className="font-bold text-lg shrink-0">投票主題 {index + 1}</h3>
+                          <button disabled={poll.isLocked} onClick={() => updateData({ polls: polls.filter(p => p.id !== poll.id) })} className={`text-red-500 hover:bg-red-50 p-1.5 rounded-md transition-colors sm:hidden ${poll.isLocked ? 'opacity-30 cursor-not-allowed hover:bg-transparent' : ''}`}>
+                            <Icon name="Trash2" className="w-5 h-5" />
+                          </button>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <label className={`flex items-center gap-2 cursor-pointer ${poll.isLocked ? 'bg-slate-50 opacity-50 cursor-not-allowed' : 'bg-slate-100 hover:bg-slate-200'} px-3 py-1.5 rounded-lg border border-slate-200 transition-colors`}>
+                            <input
+                              type="checkbox"
+                              checked={poll.isVisible !== false}
+                              disabled={poll.isLocked}
+                              onChange={(e) => {
+                                const isChecking = e.target.checked;
+                                const newPolls = [...polls];
+                                newPolls[index].isVisible = isChecking;
+                                updateData({ polls: newPolls });
+                              }}
+                              className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 disabled:opacity-50"
+                            />
+                            <span className="text-sm font-medium text-slate-700">{poll.isVisible !== false ? '顯示投票' : '隱藏投票'}</span>
+                          </label>
+                          <Button
+                            variant={poll.isLocked ? "primary" : "outline"}
+                            className={`text-xs px-3 py-1.5 h-8 ${poll.isLocked ? 'bg-green-600 hover:bg-green-700 text-white border-transparent' : 'border-slate-300'}`}
+                            onClick={() => {
+                              if (poll.isLocked) {
+                                openModal({
+                                  type: 'unlockPoll',
+                                  payload: { index },
+                                  title: '解除鎖定',
+                                  message: '請輸入管理員密碼以解除鎖定，允許修改此投票主題：',
+                                  requirePwd: true
+                                });
+                              } else {
+                                const newPolls = [...polls];
+                                newPolls[index].isLocked = true;
+                                updateData({ polls: newPolls });
+                                showToast('已個別鎖定此投票主題內容。', 'success');
+                              }
+                            }}
+                          >
+                            {poll.isLocked ? <><Icon name="Lock" className="w-3 h-3 mr-1"/>完成設定</> : <><Icon name="CheckCircle2" className="w-3 h-3 mr-1"/>完成設定</>}
+                          </Button>
+                        </div>
+                      </div>
+                      <button disabled={poll.isLocked} onClick={() => updateData({ polls: polls.filter(p => p.id !== poll.id) })} className={`text-red-500 hover:bg-red-50 p-1.5 rounded-md transition-colors hidden sm:block shrink-0 ${poll.isLocked ? 'opacity-30 cursor-not-allowed hover:bg-transparent' : ''}`}>
+                        <Icon name="Trash2" className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <div className="space-y-4">
+                      <Input 
+                        label="主題名稱" 
+                        value={poll.title} 
+                        disabled={poll.isLocked}
+                        onChange={(e) => {
+                          const newPolls = [...polls];
+                          newPolls[index].title = e.target.value;
+                          updateData({ polls: newPolls });
+                        }} 
+                        placeholder="例如：年度最佳專案"
+                      />
+                      <div className="bg-slate-50 p-4 rounded-lg border border-slate-100 space-y-3">
+                        <label className="text-sm font-medium text-slate-700">投票選項</label>
+                        {poll.options.map((opt, optIndex) => (
+                          <div key={opt.id} className="flex gap-2">
+                            <Input 
+                              className="flex-1"
+                              value={opt.text}
+                              disabled={poll.isLocked}
+                              onChange={(e) => {
+                                const newPolls = [...polls];
+                                newPolls[index].options[optIndex].text = e.target.value;
+                                updateData({ polls: newPolls });
+                              }}
+                              placeholder={`選項 ${optIndex + 1}`}
+                            />
+                            <Button disabled={poll.isLocked} variant="danger" className="px-3" onClick={() => {
+                              const newPolls = [...polls];
+                              newPolls[index].options = newPolls[index].options.filter(o => o.id !== opt.id);
+                              updateData({ polls: newPolls });
+                            }}><Icon name="Trash2" className="w-4 h-4" /></Button>
+                          </div>
+                        ))}
+                        <Button disabled={poll.isLocked} variant="outline" className="w-full mt-2 text-sm border-dashed" onClick={() => {
+                          const newPolls = [...polls];
+                          newPolls[index].options.push({ id: `o${Date.now()}`, text: '' });
+                          updateData({ polls: newPolls });
+                        }}><Icon name="Plus" className="w-4 h-4 mr-1" /> 新增選項</Button>
+                      </div>
+                      <Input 
+                        type="number" 
+                        label="每人最多可選票數" 
+                        min="1" max={poll.options.length} 
+                        value={poll.maxSelect === '' ? '' : poll.maxSelect}
+                        disabled={poll.isLocked}
+                        onChange={(e) => {
+                          const newPolls = [...polls];
+                          newPolls[index].maxSelect = e.target.value === '' ? '' : parseInt(e.target.value, 10);
+                          updateData({ polls: newPolls });
+                        }}
+                        onBlur={(e) => {
+                          if (e.target.value === '' || parseInt(e.target.value, 10) < 1) {
+                            const newPolls = [...polls];
+                            newPolls[index].maxSelect = 1;
+                            updateData({ polls: newPolls });
+                          }
+                        }}
+                      />
+                    </div>
+                  </Card>
+                ))}
+                
+                {maxOpenPolls === 0 && (
+                  <Button variant="outline" className="w-full py-4 border-dashed border-2" onClick={() => updateData({ polls: [...polls, { id: Date.now().toString(), title: '', options: [{ id: `o${Date.now()}1`, text: '' }, { id: `o${Date.now()}2`, text: '' }], maxSelect: 1, status: 'active', isVisible: true, isLocked: false }]})}>
+                    <Icon name="Plus" className="w-5 h-5 mr-2" /> 新增一個投票主題
+                  </Button>
+                )}
+              </div>
+
+              <div className="space-y-6">
+                <Card className="p-5 space-y-5 sticky top-24">
+                  <h3 className="font-bold text-lg border-b pb-2">系統設定與發佈</h3>
+                  <div className="flex flex-col gap-1.5 w-full">
+                    <label className="text-sm font-medium text-slate-700">每次最多進行的投票數目 (0 為無限制)</label>
+                    <select
+                      value={maxOpenPolls}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value) || 0;
+                        if (val > 0) {
+                          const newPolls = [];
+                          for (let i = 0; i < val; i++) {
+                            newPolls.push({
+                              id: Date.now().toString() + '_' + i,
+                              title: '',
+                              options: [{ id: `o${Date.now()}1_${i}`, text: '' }, { id: `o${Date.now()}2_${i}`, text: '' }],
+                              maxSelect: 1, status: 'active', isVisible: true, isLocked: false
+                            });
+                          }
+                          updateData({ maxOpenPolls: val, polls: newPolls });
+                          showToast(`已清空原有資料，並設定為 ${val} 個投票主題。`);
+                        } else {
+                          updateData({ maxOpenPolls: val });
+                        }
+                      }}
+                      className="w-full min-w-0 px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow appearance-none bg-white"
+                    >
+                      {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => (
+                        <option key={n} value={n}>{n}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <Input 
+                    type="datetime-local" 
+                    label="投票開始時間" 
+                    required
+                    value={startTime}
+                    className="w-full"
+                    onChange={(e) => updateData({ startTime: e.target.value })}
+                  />
+                  <Input 
+                    type="datetime-local" 
+                    label="投票截止時間" 
+                    required
+                    value={endTime}
+                    className="w-full"
+                    onChange={(e) => updateData({ endTime: e.target.value })}
+                  />
+                  
+                  <div className="flex flex-col sm:flex-row gap-3 sm:items-end w-full">
+                    <Input 
+                      type="number" 
+                      label="生成 6 位數密碼數量" 
+                      min="1"
+                      required
+                      value={numCodesToGenerate}
+                      onChange={(e) => setNumCodesToGenerate(e.target.value)}
+                      placeholder="人數"
+                      className="w-[40%] sm:flex-1"
+                    />
+                    <Button variant="secondary" onClick={handleGenerateBallotsPDF} className="w-full sm:w-auto shrink-0 h-[42px] px-4 whitespace-nowrap text-sm font-medium mt-1 sm:mt-0" disabled={isGeneratingPDF}>
+                      {isGeneratingPDF ? '生成中...' : '生成選票(PDF)'}
+                    </Button>
+                  </div>
+
+                  <Input 
+                    type="number" 
+                    label="實際派發選票數量" 
+                    min="1"
+                    required
+                    value={appData.actualDistributedCodes || ''}
+                    onChange={(e) => updateData({ actualDistributedCodes: e.target.value })}
+                    placeholder="請填寫實際派發數量"
+                    className="w-full mt-2"
+                  />
+
+                  <div className="flex flex-col gap-1.5 mt-2">
+                    <label className="text-sm font-medium text-slate-700">生成選票備註文字</label>
+                    <textarea
+                      value={appData.ballotRemark}
+                      onChange={(e) => updateData({ ballotRemark: e.target.value })}
+                      rows="3"
+                      className="px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow w-full text-sm"
+                    />
+                  </div>
+
+                  <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-lg mt-2">
+                    <Input 
+                      type="password" 
+                      label="設定結果解鎖密碼 (可解鎖目前投票結果)" 
+                      required
+                      value={adminPassword}
+                      onChange={(e) => updateData({ adminPassword: e.target.value })}
+                      placeholder="請牢記此密碼"
+                    />
+                  </div>
+                  <Button className="w-full py-3 text-lg mt-4 shadow-md" onClick={handleStartVoting}>
+                    <Icon name="CheckCircle2" className="w-5 h-5 mr-2" /> 正式開始投票
+                  </Button>
+                </Card>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'active' && (
+            <div className="grid md:grid-cols-2 gap-6">
+              
+              <Card className="p-6 flex flex-col max-h-[600px]">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-xl font-bold">投票通行碼清單</h3>
+                  <Button variant="outline" className="text-xs py-1 px-3 h-8" onClick={handleExportPasswordsCSV}>
+                    <Icon name="Download" className="w-3 h-3 mr-1" /> 匯出密碼 (CSV)
+                  </Button>
+                </div>
+                <div className="flex justify-between items-center mb-4">
+                  <span className="text-sm font-medium bg-blue-100 text-blue-800 px-3 py-1 rounded-full">
+                    已使用: {voterCodes.filter(c => c.used).length} / {appData.actualDistributedCodes || voterCodes.length}
+                  </span>
+                </div>
+                <p className="text-sm text-slate-500 mb-4">請將以下 6 位數密碼分發給投票者。每個密碼只能進入系統投票一次。</p>
+                <div className="flex-1 overflow-y-auto border rounded-lg bg-slate-50 p-2 grid grid-cols-2 sm:grid-cols-3 gap-2 content-start">
+                  {voterCodes.map((codeObj, idx) => (
+                    <div key={idx} className={`p-2 text-center font-mono font-bold text-lg rounded border ${codeObj.used ? 'bg-slate-200 text-slate-400 border-slate-300 line-through' : 'bg-white text-blue-700 border-blue-200 shadow-sm'}`}>
+                      {codeObj.code}
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-6 pt-4 border-t flex justify-end">
+                  <Button variant="danger" onClick={handleEndVoting}>
+                    系統關閉投票
+                  </Button>
+                </div>
+              </Card>
+
+              <div className="space-y-6">
+                <Card className="p-6 flex flex-col items-center justify-center text-center space-y-4">
+                  <div className="bg-blue-50 p-4 rounded-full">
+                    <Icon name="QrCode" className="w-12 h-12 text-blue-600" />
+                  </div>
+                  
+                  <div className="text-center space-y-2">
+                    <h2 className="text-2xl font-extrabold text-slate-800">馬頭涌官立小學</h2>
+                    <div className="text-xl font-bold text-slate-700 flex flex-col items-center gap-1 my-3">
+                      {polls.filter(p => p.isVisible !== false).map((p, idx) => (
+                        <div key={p.id}>投票({idx + 1}): {p.title}</div>
+                      ))}
+                      {polls.filter(p => p.isVisible !== false).length === 0 && <div>投票名稱</div>}
+                    </div>
+                    <p className="text-slate-600 font-medium">請掃描以下二維碼進入網站投票</p>
+                  </div>
+                  
+                  <a href={typeof window !== 'undefined' ? window.location.origin + window.location.pathname + '?view=voter' : '#'} target="_blank" rel="noopener noreferrer" className="mt-4 block hover:scale-105 transition-transform cursor-pointer">
+                    <img src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(typeof window !== 'undefined' ? window.location.origin + window.location.pathname + '?view=voter' : 'Voting')}&margin=10`} alt="QR Code" className="rounded-lg border shadow-sm mx-auto" />
+                  </a>
+                  <p className="text-xs text-slate-500 font-medium mt-2">(點擊二維碼可直接開啟投票網頁)</p>
+                </Card>
+
+                <Card className="p-6">
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-xl font-bold text-slate-800">投票主題管理</h3>
+                    <div className="flex gap-2">
+                      <Button variant="outline" className="text-xs px-2 py-1 h-8" onClick={handleEndAllPolls}>全部結束</Button>
+                      <Button variant="danger" className="text-xs px-2 py-1 h-8" onClick={handleResetAllPolls}>全部重設</Button>
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    {polls.map(poll => {
+                      const isTimeEnded = endTime && new Date().getTime() > new Date(endTime).getTime();
+                      const currentDisplayStatus = (poll.status === 'active' && !isTimeEnded) ? 'active' : 'ended';
+                      return (
+                      <div key={poll.id} className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 p-4 bg-slate-50 border rounded-lg">
+                        <div>
+                          <div className="font-bold text-slate-800">{poll.title} {poll.isVisible === false && <span className="text-xs text-slate-400 font-normal">(已設定為隱藏)</span>}</div>
+                          <div className={`inline-block mt-1 px-2 py-0.5 text-xs rounded-full ${currentDisplayStatus === 'active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                            {currentDisplayStatus === 'active' ? '開放中' : '已結束'}
+                          </div>
+                        </div>
+                        <div className="flex gap-2 shrink-0">
+                          <Button variant="secondary" className="text-xs px-3 py-1.5" onClick={() => handleTogglePollStatus(poll.id)}>
+                            {currentDisplayStatus === 'active' ? '暫停' : '重新開放'}
+                          </Button>
+                          <Button variant="outline" className="text-xs px-3 py-1.5" onClick={() => {
+                            openModal({
+                              type: 'resetPollData',
+                              payload: { id: poll.id },
+                              title: '提示訊息',
+                              message: '重設數據會將已進行統計的數據重置,敬請留意。',
+                              requirePwd: false
+                            });
+                          }}>重設數據</Button>
+                        </div>
+                      </div>
+                      );
+                    })}
+                  </div>
+                </Card>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'results' && (
+            <div className="space-y-6">
+              {!isUnlocked ? (
+                <Card className="p-8 max-w-md mx-auto mt-12 text-center print:hidden">
+                  <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Icon name="Lock" className="w-8 h-8 text-slate-500" />
+                  </div>
+                  <h3 className="text-2xl font-bold mb-2">投票已結束</h3>
+                  <p className="text-slate-500 mb-6">請輸入投票結果解鎖密碼以查看最終統計。</p>
+                  <form onSubmit={handleUnlock} className="space-y-4">
+                    <Input 
+                      type="password" 
+                      placeholder="輸入解鎖密碼" 
+                      value={unlockPassword}
+                      onChange={(e) => setUnlockPassword(e.target.value)}
+                      className="text-center"
+                    />
+                    <Button type="submit" className="w-full"><Icon name="Key" className="w-4 h-4 mr-2" /> 解鎖結果</Button>
+                  </form>
+                </Card>
+              ) : (
+                <div className="space-y-6">
+                  {excessCount > 0 && (
+                    <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-6 rounded-r-lg shadow-sm">
+                      <div className="flex items-center mb-2">
+                        <Icon name="AlertCircle" className="w-6 h-6 text-red-500 mr-2" />
+                        <p className="text-red-700 font-bold text-lg">系統警告：投票人數大於實際派發選票數量</p>
+                      </div>
+                      <p className="text-red-600 text-sm ml-8 font-medium">
+                        實際派發選票數量為 {actualCount} 張，但系統錄得 {usedCodes.length} 人完成投票。
+                        為確保公平，系統已按遞交時間自動排除最後遞交的 {excessCount} 張多出選票。以下結果僅計算首 {actualCount} 張有效選票。
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-end print:hidden mb-2">
+                    <div className="flex flex-col w-full sm:w-auto">
+                      <div className="flex justify-between items-center w-full">
+                        <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-800">最終投票結果</h2>
+                        {/* 手機版排版的按鈕 */}
+                        <div className="flex sm:hidden gap-1.5 ml-3">
+                          <Button variant="outline" onClick={() => window.print()} className="px-2 py-1 h-8 text-xs border-slate-300">
+                            <Icon name="Printer" className="w-3.5 h-3.5 mr-1" /> 列印
+                          </Button>
+                          <Button variant="primary" onClick={() => {
+                              let csv = '\uFEFF投票主題,選項,得票數\n';
+                              polls.forEach(poll => {
+                                poll.options.forEach(opt => {
+                                  const votes = validUsedCodes.filter(c => c.votes[poll.id]?.includes(opt.id)).length;
+                                  csv += `"${poll.title}","${opt.text}",${votes}\n`;
+                                });
+                              });
+                              const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                              const url = URL.createObjectURL(blob);
+                              const link = document.createElement('a');
+                              link.href = url;
+                              link.download = 'voting_results.csv';
+                              link.click();
+                            }} className="px-2 py-1 h-8 text-xs">
+                            <Icon name="Download" className="w-3.5 h-3.5 mr-1" /> 匯出
+                          </Button>
+                          <Button variant={appData.isResultsPublished ? "danger" : "success"} onClick={() => {
+                              updateData({ isResultsPublished: !appData.isResultsPublished });
+                              showToast(appData.isResultsPublished ? '已取消公佈結果' : '結果已向公眾發佈！公眾可於投票站查看。', 'success');
+                            }} className="px-2 py-1 h-8 text-xs">
+                            <Icon name={appData.isResultsPublished ? "Lock" : "CheckCircle2"} className="w-3.5 h-3.5 mr-1" /> 
+                            {appData.isResultsPublished ? '取消' : '結果'}
+                          </Button>
+                        </div>
+                      </div>
+                      <p className="text-slate-500 mt-1 mb-4 sm:mb-0 text-sm sm:text-base font-bold">有效投票人數: {validUsedCodes.length} 人</p>
+                    </div>
+                    {/* 電腦版排版的按鈕 */}
+                    <div className="hidden sm:flex gap-2">
+                      <Button variant="outline" onClick={() => window.print()}>
+                        <Icon name="Printer" className="w-4 h-4 mr-2" /> 列印報告
+                      </Button>
+                      <Button variant="primary" onClick={() => {
+                        let csv = '\uFEFF投票主題,選項,得票數\n';
+                        polls.forEach(poll => {
+                          poll.options.forEach(opt => {
+                            const votes = validUsedCodes.filter(c => c.votes[poll.id]?.includes(opt.id)).length;
+                            csv += `"${poll.title}","${opt.text}",${votes}\n`;
+                          });
+                        });
+                        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                        const url = URL.createObjectURL(blob);
+                        const link = document.createElement('a');
+                        link.href = url;
+                        link.download = 'voting_results.csv';
+                        link.click();
+                      }}>
+                        <Icon name="Download" className="w-4 h-4 mr-2" /> 匯出 CSV
+                      </Button>
+                      <Button variant={appData.isResultsPublished ? "danger" : "success"} onClick={() => {
+                        updateData({ isResultsPublished: !appData.isResultsPublished });
+                        showToast(appData.isResultsPublished ? '已取消公佈結果' : '結果已向公眾發佈！公眾可於投票站查看。', 'success');
+                      }}>
+                        <Icon name={appData.isResultsPublished ? "Lock" : "CheckCircle2"} className="w-4 h-4 mr-2" /> 
+                        {appData.isResultsPublished ? '取消公佈' : '公佈結果'}
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* 解鎖後的取消解鎖按鈕 */}
+                  <div className="flex justify-end mb-6 print:hidden">
+                    <Button variant="outline" onClick={() => { setIsUnlocked(false); setUnlockPassword(''); }} className="w-full sm:w-auto border-slate-300 text-slate-600 hover:bg-slate-100">
+                      <Icon name="Lock" className="w-4 h-4 mr-2" /> 取消解鎖
+                    </Button>
+                  </div>
+
+                  <div className="hidden print:block mb-8 text-center">
+                    <h1 className="text-3xl font-bold mb-2">官方投票統計報告</h1>
+                    <p className="text-slate-600">產生時間: {new Date().toLocaleString('zh-TW')} | 有效投票人數: {validUsedCodes.length}</p>
+                    {excessCount > 0 && <p className="text-red-500 font-bold mt-1">(已依法自動排除超出派發數量的 {excessCount} 張選票)</p>}
+                  </div>
+
+                  <div className="grid md:grid-cols-2 gap-6 print:grid-cols-1 print:gap-8">
+                    {polls.map((poll) => {
+                      const totalVotesForPoll = validUsedCodes.reduce((acc, code) => {
+                        return acc + (code.votes[poll.id] ? code.votes[poll.id].length : 0);
+                      }, 0);
+
+                      const sortedOptions = [...poll.options].sort((a, b) => {
+                        const votesA = validUsedCodes.filter(c => c.votes[poll.id]?.includes(a.id)).length;
+                        const votesB = validUsedCodes.filter(c => c.votes[poll.id]?.includes(b.id)).length;
+                        return votesB - votesA;
+                      });
+
+                      return (
+                        <Card key={poll.id} className="p-6 break-inside-avoid">
+                          <h3 className="text-xl font-bold mb-6 text-slate-800">{poll.title}</h3>
+                          <div className="space-y-5">
+                            {sortedOptions.map(opt => {
+                              const votes = validUsedCodes.filter(c => c.votes[poll.id]?.includes(opt.id)).length;
+                              const percentage = totalVotesForPoll === 0 ? 0 : Math.round((votes / totalVotesForPoll) * 100);
+                              
+                              return (
+                                <div key={opt.id} className="relative">
+                                  <div className="flex justify-between text-sm font-medium mb-1">
+                                    <span className="text-slate-700">{opt.text}</span>
+                                    <span className="text-slate-900">{votes} 票 ({percentage}%)</span>
+                                  </div>
+                                  <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden border border-slate-200">
+                                    <div 
+                                      className="bg-blue-600 h-full rounded-full transition-all duration-1000 ease-out" 
+                                      style={{ width: `${percentage}%` }}
+                                    ></div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 替換原本的 alert/prompt 的自定義 Modal */}
+          {modalConfig.isOpen && (
+            <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm print:hidden">
+              <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm m-4 animate-in fade-in zoom-in-95">
+                <h3 className="text-xl font-bold mb-2">{modalConfig.title}</h3>
+                <p className="text-slate-600 mb-6 text-sm">{modalConfig.message}</p>
+                <form onSubmit={handleModalConfirm} className="space-y-4">
+                  {modalConfig.requirePwd && (
+                    <Input
+                      type="password"
+                      placeholder="請輸入管理員密碼"
+                      value={modalInput}
+                      onChange={(e) => setModalInput(e.target.value)}
+                      autoFocus={true}
+                    />
+                  )}
+                  <div className="flex gap-3 justify-end mt-6">
+                    <Button variant="secondary" onClick={closeModal} type="button">取消</Button>
+                    <Button variant={modalConfig.requirePwd ? "primary" : "danger"} type="submit">確認</Button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* 隱藏的 PDF 生成版面 */}
+          {isGeneratingPDF && (
+            <div style={{ position: 'absolute', top: 0, left: 0, zIndex: -9999, pointerEvents: 'none' }}>
+              <div id="ballot-pdf-container" style={{ width: '210mm', backgroundColor: '#fff' }}>
+                {pdfPages.map((pageCodes, pageIndex) => (
+                  <div key={pageIndex} className="pdf-page" style={{ 
+                    width: '210mm', 
+                    height: '296mm', 
+                    padding: '8mm', 
+                    boxSizing: 'border-box', 
+                    backgroundColor: '#fff',
+                    overflow: 'hidden', 
+                    pageBreakAfter: pageIndex < pdfPages.length - 1 ? 'always' : 'auto',
+                    display: 'block' 
+                  }}>
+                    {pageCodes.map((c, idx) => {
+                      const globalIndex = pageIndex * 4 + idx;
+                      return (
+                        <div key={idx} style={{ 
+                          height: '70mm', 
+                          padding: '4mm 0', 
+                          boxSizing: 'border-box',
+                          borderBottom: idx !== 3 ? '1px dashed #999' : 'none',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          fontFamily: '"Microsoft JhengHei", "PingFang TC", sans-serif',
+                          pageBreakInside: 'avoid'
+                        }}>
+                          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', paddingRight: '10mm', paddingTop: '2mm', paddingBottom: '2mm' }}>
+                            {/* 上半部：標題與日期 */}
+                            <div>
+                              <h2 style={{ fontSize: '18pt', fontWeight: 'bold', margin: '0 0 4px 0', color: '#000' }}>馬頭涌官立小學</h2>
+                              {polls.filter(p => p.isVisible !== false).map((p, i) => (
+                                <div key={i} style={{ fontSize: '12pt', fontWeight: 'bold', margin: '2px 0', color: '#000' }}>
+                                  投票主題({i+1})：{p.title.replace(/\(多選\)|（多選）/g, '').trim()}
+                                </div>
+                              ))}
+                              <div style={{ fontSize: '11pt', fontWeight: 'bold', margin: '4px 0 0 0', color: '#000' }}>
+                                投票日期：{formatTime(startTime)} 至 {formatTime(endTime)}
+                              </div>
+                            </div>
+                            
+                            {/* 中間部：放大並置中的密碼 */}
+                            <div style={{ flex: 1, display: 'flex', alignItems: 'center' }}>
+                              <div style={{ fontSize: '24pt', fontWeight: 'bold', color: '#000' }}>
+                                生成的6位數密碼：<span style={{ color: '#0000FF' }}>{c.code}</span>
+                              </div>
+                            </div>
+
+                            {/* 下半部：備註 (使用 flex 確保第二列文字與第一列對齊) */}
+                            <div>
+                              <div style={{ fontSize: '9pt', fontWeight: 'bold', color: '#000', lineHeight: '1.4', display: 'flex' }}>
+                                <span style={{ whiteSpace: 'nowrap' }}>備註：</span>
+                                <span>{appData.ballotRemark}</span>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <div style={{ width: '45mm', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', paddingTop: '2mm', paddingBottom: '2mm' }}>
+                            <div style={{ fontSize: '12pt', fontWeight: 'bold', color: '#000', marginBottom: '8px' }}>
+                              S/N: MTC{String(globalIndex + 1).padStart(5, '0')}
+                            </div>
+                            {/* 校方蓋章 */}
+                            <div style={{ 
+                              width: '45mm', 
+                              height: '45mm', 
+                              border: '1px solid #000', 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              justifyContent: 'center',
+                              fontSize: '14pt',
+                              fontWeight: 'bold',
+                              color: '#888',
+                              marginTop: 'auto',
+                              marginBottom: 'auto'
+                            }}>
+                              校方蓋章
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // --- 投票者元件 ---
+    function VoterInterface({ appData, updateData, currentVoterCode, setCurrentVoterCode, showToast }) {
+      const { systemState, polls, startTime, endTime, voterCodes, maxOpenPolls, isResultsPublished } = appData;
+      const [inputCode, setInputCode] = useState('');
+      const [timeStatus, setTimeStatus] = useState('waiting'); 
+      const [timeLeft, setTimeLeft] = useState(null);
+      const [selections, setSelections] = useState({});
+      const [showConfirmModal, setShowConfirmModal] = useState(false);
+
+      useEffect(() => {
+        if (systemState !== 'active' || !endTime || !startTime) return;
+
+        const timer = setInterval(() => {
+          const now = new Date().getTime();
+          const start = new Date(startTime).getTime();
+          const end = new Date(endTime).getTime();
+
+          const formatTimeDiff = (distance) => {
+            const days = Math.floor(distance / (1000 * 60 * 60 * 24));
+            const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+            let timeStr = '';
+            if (days > 0) timeStr += `${days}日:`;
+            timeStr += `${hours.toString().padStart(2, '0')}時:${minutes.toString().padStart(2, '0')}分:${seconds.toString().padStart(2, '0')}秒`;
+            return timeStr;
+          };
+
+          if (now < start) {
+            setTimeStatus('waiting');
+            setTimeLeft(`距離投票時間尚有: ${formatTimeDiff(start - now)}`);
+          } else if (now > end) {
+            clearInterval(timer);
+            setTimeStatus('ended');
+            setTimeLeft('投票已截止');
+          } else {
+            setTimeStatus('active');
+            setTimeLeft(`距離投票完結時間尚餘: ${formatTimeDiff(end - now)}`);
+          }
+        }, 1000);
+
+        return () => clearInterval(timer);
+      }, [systemState, startTime, endTime]);
+
+      const handleLogin = (e) => {
+        e.preventDefault();
+        
+        if (systemState === 'setup') return showToast('投票系統尚未啟用。', 'error');
+        if (timeStatus === 'waiting') return showToast('投票尚未開始，請於開始時間後再試。', 'error');
+        if (systemState === 'ended' || timeStatus === 'ended') return showToast('投票活動已經結束！', 'error');
+        
+        const codeObj = voterCodes.find(c => c.code === inputCode.toUpperCase());
+        if (!codeObj) {
+          showToast('無效的通行碼，請確認後再試。', 'error');
+        } else if (codeObj.used) {
+          showToast('此通行碼已經完成投票，無法重複使用。', 'error');
+        } else {
+          setCurrentVoterCode(codeObj.code);
+          const initialSelections = {};
+          polls.forEach(p => initialSelections[p.id] = []);
+          setSelections(initialSelections);
+          showToast('驗證成功，請開始投票！');
+        }
+      };
+
+      const handleOptionToggle = (pollId, optionId, maxSelect) => {
+        setSelections(prev => {
+          const currentSelected = prev[pollId] || [];
+          
+          if (currentSelected.includes(optionId)) {
+            // 無論單選或多選，已勾選再次點擊即取消選取 (Toggle Off)
+            return { ...prev, [pollId]: currentSelected.filter(id => id !== optionId) };
+          } else {
+            // 單選模式下點擊新項目，直接取代舊項目
+            if (maxSelect === 1) {
+              return { ...prev, [pollId]: [optionId] };
+            }
+            
+            // 多選模式下，若已達上限則阻擋
+            if (currentSelected.length >= maxSelect) {
+              showToast(`此主題最多只能選擇 ${maxSelect} 項`, 'error');
+              return prev;
+            }
+            
+            return { ...prev, [pollId]: [...currentSelected, optionId] };
+          }
+        });
+      };
+
+      const handleSubmitVote = () => {
+        const newVoterCodes = voterCodes.map(c => {
+          if (c.code === currentVoterCode) {
+            return { ...c, used: true, usedAt: Date.now(), votes: selections };
+          }
+          return c;
+        });
+        
+        updateData({ voterCodes: newVoterCodes });
+        setCurrentVoterCode('SUBMITTED_SUCCESS');
+      };
+
+      const handleLogout = () => {
+        setCurrentVoterCode(null);
+        setInputCode('');
+      };
+
+      // --- 若已公佈結果，公眾介面強制顯示最終報告 ---
+      if (isResultsPublished) {
+        const actualCount = parseInt(appData.actualDistributedCodes) || voterCodes.length;
+        const usedCodes = voterCodes.filter(c => c.used);
+        usedCodes.sort((a, b) => (a.usedAt || 0) - (b.usedAt || 0));
+        const excessCount = usedCodes.length - actualCount;
+        const validUsedCodes = excessCount > 0 ? usedCodes.slice(0, actualCount) : usedCodes;
+
+        return (
+          <div className="max-w-4xl mx-auto space-y-6 pb-20 mt-8 animate-in fade-in">
+            <Card className="p-8 shadow-xl border-t-4 border-t-blue-600 mb-8 text-center">
+               <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Icon name="CheckCircle2" className="w-8 h-8" />
+               </div>
+               <h2 className="text-3xl font-black text-slate-800 mb-2">最終投票結果</h2>
+               <p className="text-slate-800 font-bold">總參與人數：{validUsedCodes.length} 人</p>
+               {excessCount > 0 && <p className="text-sm text-red-500 font-bold mt-1">(因超過派發總數，已自動排除 {excessCount} 張無效票)</p>}
+            </Card>
+            
+            <div className="grid md:grid-cols-2 gap-6">
+              {polls.map((poll) => {
+                const totalVotesForPoll = validUsedCodes.reduce((acc, code) => {
+                  return acc + (code.votes[poll.id] ? code.votes[poll.id].length : 0);
+                }, 0);
+
+                const sortedOptions = [...poll.options].sort((a, b) => {
+                  const votesA = validUsedCodes.filter(c => c.votes[poll.id]?.includes(a.id)).length;
+                  const votesB = validUsedCodes.filter(c => c.votes[poll.id]?.includes(b.id)).length;
+                  return votesB - votesA;
+                });
+
+                return (
+                  <Card key={poll.id} className="p-6 break-inside-avoid">
+                    <h3 className="text-xl font-bold mb-6 text-slate-800">{poll.title}</h3>
+                    <div className="space-y-5">
+                      {sortedOptions.map(opt => {
+                        const votes = validUsedCodes.filter(c => c.votes[poll.id]?.includes(opt.id)).length;
+                        const percentage = totalVotesForPoll === 0 ? 0 : Math.round((votes / totalVotesForPoll) * 100);
+                        
+                        return (
+                          <div key={opt.id} className="relative">
+                            <div className="flex justify-between text-sm font-medium mb-1">
+                              <span className="text-slate-700">{opt.text}</span>
+                              <span className="text-slate-900">{votes} 票 ({percentage}%)</span>
+                            </div>
+                            <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden border border-slate-200">
+                              <div 
+                                className="bg-blue-600 h-full rounded-full transition-all duration-1000 ease-out" 
+                                style={{ width: `${percentage}%` }}
+                              ></div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </Card>
+                );
+              })}
+            </div>
+          </div>
+        );
+      }
+
+      // --- 若投票已結束但未公佈結果，顯示無法投票提示 (票站掃描進入時的攔截) ---
+      if (systemState === 'ended' || timeStatus === 'ended') {
+        return (
+          <div className="flex items-center justify-center min-h-[60vh]">
+            <Card className="w-full max-w-md p-8 text-center shadow-xl border-t-4 border-t-red-600">
+              <div className="w-20 h-20 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Icon name="AlertCircle" className="w-10 h-10" />
+              </div>
+              <h2 className="text-2xl font-extrabold text-black mb-4">投票已結束</h2>
+              <p className="text-slate-600 font-medium mb-8">投票活動已經結束，不能進行投票。</p>
+              <Button variant="outline" onClick={() => window.location.href = window.location.origin + window.location.pathname} className="w-full font-bold">
+                返回首頁
+              </Button>
+            </Card>
+          </div>
+        );
+      }
+
+      if (!currentVoterCode) {
+        return (
+          <div className="flex items-center justify-center min-h-[60vh]">
+            <Card className="w-full max-w-md p-8 text-center shadow-xl border-t-4 border-t-blue-600">
+              <h2 className="text-2xl font-extrabold text-black mb-1">馬頭涌官立小學</h2>
+              <h2 className="text-2xl font-extrabold text-black mb-1">投票系統</h2>
+              <h3 className="text-lg font-bold text-black mb-4">登入投票網站須進行身份認證</h3>
+              <p className="text-slate-600 font-medium mb-8">(請輸入校方提供的6位驗證碼進行投票)</p>
+              
+              <form onSubmit={handleLogin} className="space-y-6">
+                <input
+                  type="text"
+                  maxLength={6}
+                  value={inputCode}
+                  onChange={(e) => setInputCode(e.target.value.toUpperCase())}
+                  placeholder="例如：AB12CD"
+                  className="w-full text-center text-3xl tracking-widest font-mono font-bold px-4 py-4 border-2 border-slate-300 rounded-lg focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all uppercase"
+                />
+                <Button type="submit" className="w-full py-4 text-lg" disabled={inputCode.length !== 6}>
+                  前往投票網站 <Icon name="ArrowRight" className="w-5 h-5 ml-2" />
+                </Button>
+              </form>
+              
+              {systemState === 'active' && timeLeft && (
+                 <div className={`mt-6 p-3 rounded-lg text-sm font-medium ${timeStatus === 'waiting' ? 'bg-yellow-50 text-yellow-700' : timeStatus === 'ended' ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-600'}`}>
+                   {timeStatus === 'waiting' ? timeLeft : timeStatus === 'ended' ? '投票已結束' : timeLeft}
+                 </div>
+              )}
+            </Card>
+          </div>
+        );
+      }
+
+      if (currentVoterCode === 'SUBMITTED_SUCCESS') {
+        const participatedCount = voterCodes.filter(c => c.used).length;
+        const totalCount = parseInt(appData.actualDistributedCodes) || voterCodes.length;
+        const participationRate = totalCount > 0 ? Math.round((participatedCount / totalCount) * 100) : 0;
+
+        return (
+          <div className="flex items-center justify-center min-h-[60vh]">
+            <Card className="w-full max-w-md p-8 text-center shadow-lg border-t-4 border-t-green-500">
+              <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Icon name="CheckCircle2" className="w-10 h-10" />
+              </div>
+              <h2 className="text-2xl font-bold mb-4">投票已完成</h2>
+              
+              <p className="text-black font-bold mb-6 leading-relaxed">
+                <span className="block sm:inline">感謝您參與投票,</span>
+                <span className="block sm:inline sm:ml-1">結果將於投票結束後公佈.</span>
+              </p>
+              <div className="bg-slate-50 p-5 rounded-lg mb-8 text-left border border-slate-100 font-bold">
+                <div className="flex justify-between items-center mb-3">
+                  <span className="text-black">現時參與投票人數：</span>
+                  <span className="text-xl text-blue-600">{participatedCount} 人</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-black">現時投票參與率：</span>
+                  <span className="text-xl text-blue-600">{participationRate}%</span>
+                </div>
+              </div>
+              <Button variant="outline" onClick={handleLogout} className="w-full font-bold">
+                <Icon name="LogOut" className="w-4 h-4 mr-2" /> 返回首頁
+              </Button>
+            </Card>
+          </div>
+        );
+      }
+
+      // 取得可顯示的投票項目 (過濾掉設定為隱藏的主題)
+      const displayPolls = polls.filter(p => p.status === 'active' && p.isVisible !== false);
+
+      return (
+        <div className="max-w-3xl mx-auto space-y-6 pb-20">
+          <Card className="p-3 sm:p-4 flex flex-col sm:flex-row justify-between items-stretch sm:items-center sticky top-[60px] sm:top-[80px] z-40 bg-white/90 backdrop-blur-md shadow-sm gap-3 sm:gap-0">
+            <div className="flex items-center gap-3 w-full sm:w-auto">
+              <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center font-mono font-bold text-slate-700 text-sm shrink-0">
+                {currentVoterCode}
+              </div>
+              <div className="flex flex-col">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-slate-500">當前通行碼</span>
+                  <span className="text-xs text-green-600 font-bold flex items-center gap-1"><Icon name="CheckCircle2" className="w-3 h-3"/> 已驗證</span>
+                </div>
+              </div>
+            </div>
+
+            {timeLeft && (
+              <div className="border-t sm:border-0 border-slate-100 pt-3 sm:pt-0 flex flex-col sm:items-end w-full sm:w-auto">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 sm:mb-0">剩餘時間</span>
+                <div className={`text-xs sm:text-sm md:text-base font-bold flex items-center sm:gap-1.5 ${timeStatus === 'ended' ? 'text-red-600' : 'text-blue-600'}`}>
+                  <Icon name="Clock" className="w-4 h-4 hidden sm:block shrink-0" />
+                  <span className="font-mono">{timeLeft}</span>
+                </div>
+              </div>
+            )}
+          </Card>
+
+          <div className="space-y-8 mt-8">
+            {displayPolls.length === 0 ? (
+               <div className="text-center p-8 text-slate-500">目前沒有開放的投票主題。</div>
+            ) : (
+              displayPolls.map((poll, index) => {
+                const selectedCount = selections[poll.id]?.length || 0;
+                return (
+                  <Card key={poll.id} className="overflow-hidden border-2 border-slate-100 hover:border-blue-100 transition-colors">
+                    <div className="bg-slate-50 px-4 sm:px-6 py-4 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0">
+                      <h3 className="text-lg sm:text-xl font-bold text-slate-800 flex items-start sm:items-center gap-2 leading-snug">
+                        <span className="bg-blue-600 text-white w-6 h-6 rounded-full inline-flex items-center justify-center text-sm shrink-0">{index + 1}</span>
+                        <span>{poll.title}</span>
+                      </h3>
+                      <span className={`text-sm font-medium px-3 py-1 rounded-full inline-block ${selectedCount === poll.maxSelect ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
+                        可選 {poll.maxSelect} 項 (已選 {selectedCount})
+                      </span>
+                    </div>
+                    <div className="p-4 sm:p-6 space-y-3">
+                      {poll.options.map(opt => {
+                        const isSelected = selections[poll.id]?.includes(opt.id);
+                        const isDisabled = poll.maxSelect > 1 && !isSelected && selectedCount >= poll.maxSelect;
+                        
+                        return (
+                          <label 
+                            key={opt.id} 
+                            className={`flex items-center p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                              isSelected 
+                                ? 'border-blue-500 bg-blue-50/50' 
+                                : isDisabled 
+                                  ? 'border-slate-100 bg-slate-50 opacity-50 cursor-not-allowed' 
+                                  : 'border-slate-200 hover:border-blue-300 hover:bg-slate-50'
+                            }`}
+                          >
+                            <div className="relative flex items-center justify-center">
+                              <input
+                                type={poll.maxSelect === 1 ? 'radio' : 'checkbox'}
+                                name={`poll-${poll.id}`}
+                                checked={isSelected}
+                                disabled={isDisabled}
+                                onChange={() => {
+                                  if (!isDisabled) {
+                                    handleOptionToggle(poll.id, opt.id, poll.maxSelect);
+                                  }
+                                }}
+                                className="w-5 h-5 text-blue-600 border-slate-300 rounded focus:ring-blue-500 cursor-pointer"
+                              />
+                            </div>
+                            <span className={`ml-4 text-lg ${isSelected ? 'font-medium text-blue-900' : 'text-slate-700'}`}>
+                              {opt.text}
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </Card>
+                );
+              })
+            )}
+          </div>
+
+          <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-4 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)] z-50">
+            <div className="max-w-3xl mx-auto flex justify-between items-center">
+              <Button variant="outline" onClick={handleLogout} className="text-slate-500 border-slate-200">
+                取消並登出
+              </Button>
+              <Button onClick={() => setShowConfirmModal(true)} className="px-8 py-3 text-lg shadow-lg hover:-translate-y-0.5 transition-transform" disabled={timeStatus === 'ended' || displayPolls.length === 0}>
+                確認送出選票 <Icon name="CheckCircle2" className="w-5 h-5 ml-2" />
+              </Button>
+            </div>
+          </div>
+
+          {showConfirmModal && (
+            <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm print:hidden">
+              <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm m-4 animate-in fade-in zoom-in-95">
+                <h3 className="text-xl font-bold mb-2">提示訊息</h3>
+                <p className="text-slate-600 mb-6 text-sm">請確認選票,經確認後選項將不能更改,敬請留意!</p>
+                <div className="flex gap-3 justify-end mt-6">
+                  <Button variant="secondary" onClick={() => setShowConfirmModal(false)}>取消</Button>
+                  <Button variant="primary" onClick={() => {
+                    setShowConfirmModal(false);
+                    handleSubmitVote();
+                  }}>確認</Button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
