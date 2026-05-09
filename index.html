@@ -482,7 +482,7 @@ apiKey: "AIzaSyAM63c2Fx8FM_BfZNoNlJaOE4PfmU62mKg",
         const { type, payload, requirePwd } = modalConfig;
 
         const obfuscatedInput = modalInput.trim().split('').map(c => String.fromCharCode(c.charCodeAt(0) + 3)).join('');
-        if (requirePwd && obfuscatedInput !== 'Pwf05859') {
+        if (requirePwd && obfuscatedInput !== 'Vpu05859') {
           showToast('密碼錯誤！', 'error');
           return;
         }
@@ -523,16 +523,11 @@ apiKey: "AIzaSyAM63c2Fx8FM_BfZNoNlJaOE4PfmU62mKg",
         if (!appData.actualDistributedCodes || parseInt(appData.actualDistributedCodes) <= 0) return showToast('請填寫實際派發選票數量。', 'error');
         if (!adminPassword) return showToast('請設定解鎖結果用的密碼。', 'error');
         
-        const codesToGen = parseInt(numCodesToGenerate) || 0;
-        let newCodes = voterCodes;
-        if (voterCodes.length !== codesToGen) {
-          newCodes = [];
-          for (let i = 0; i < codesToGen; i++) {
-            newCodes.push({ code: generateRandomCode(), used: false, votes: {}, usedAt: null });
-          }
+        if (!voterCodes || voterCodes.length === 0) {
+          return showToast('請先生成選票，然後才能正式開始投票。', 'error');
         }
         
-        updateData({ voterCodes: newCodes, systemState: 'active' });
+        updateData({ systemState: 'active' });
         showToast('投票已正式啟動！');
       };
 
@@ -654,14 +649,14 @@ apiKey: "AIzaSyAM63c2Fx8FM_BfZNoNlJaOE4PfmU62mKg",
           return showToast('請輸入有效的生成選票數量', 'error');
         }
 
-        let currentCodes = voterCodes;
-        if (currentCodes.length !== codesToGen) {
-          currentCodes = [];
-          for (let i = 0; i < codesToGen; i++) {
-            currentCodes.push({ code: generateRandomCode(), used: false, votes: {}, usedAt: null });
-          }
-          updateData({ voterCodes: currentCodes });
+        const validPollIds = visiblePolls.map(p => p.id);
+
+        // 每次點擊都重新生成對應數量的選票，並綁定當前的投票主題
+        let currentCodes = [];
+        for (let i = 0; i < codesToGen; i++) {
+          currentCodes.push({ code: generateRandomCode(), used: false, votes: {}, usedAt: null, validPolls: validPollIds });
         }
+        updateData({ voterCodes: currentCodes });
 
         setIsGeneratingPDF(true);
         showToast('正在產生 PDF，請稍候...');
@@ -938,26 +933,29 @@ apiKey: "AIzaSyAM63c2Fx8FM_BfZNoNlJaOE4PfmU62mKg",
                         value={numCodesToGenerate}
                         onChange={(e) => setNumCodesToGenerate(e.target.value)}
                         placeholder="人數"
-                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow appearance-none bg-white"
+                        disabled={systemState !== 'setup'}
+                        className={`w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow appearance-none ${systemState !== 'setup' ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : 'bg-white'}`}
                       />
                     </div>
                     
                     <div className="flex items-center gap-6 py-1">
-                      <label className="flex items-center gap-2 cursor-pointer">
+                      <label className={`flex items-center gap-2 ${systemState !== 'setup' ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}>
                         <input 
                           type="checkbox" 
                           checked={printMode === 'sequential'} 
                           onChange={() => setPrintMode('sequential')} 
-                          className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 cursor-pointer"
+                          disabled={systemState !== 'setup'}
+                          className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 disabled:cursor-not-allowed"
                         />
                         <span className="text-sm font-medium text-slate-700">順序</span>
                       </label>
-                      <label className="flex items-center gap-2 cursor-pointer">
+                      <label className={`flex items-center gap-2 ${systemState !== 'setup' ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}>
                         <input 
                           type="checkbox" 
                           checked={printMode === 'page'} 
                           onChange={() => setPrintMode('page')} 
-                          className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 cursor-pointer"
+                          disabled={systemState !== 'setup'}
+                          className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 disabled:cursor-not-allowed"
                         />
                         <span className="text-sm font-medium text-slate-700">頁面</span>
                       </label>
@@ -967,7 +965,7 @@ apiKey: "AIzaSyAM63c2Fx8FM_BfZNoNlJaOE4PfmU62mKg",
                       variant="secondary" 
                       onClick={handleGenerateBallotsPDF} 
                       className="w-full py-2.5 text-sm font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-300" 
-                      disabled={isGeneratingPDF}
+                      disabled={isGeneratingPDF || systemState !== 'setup'}
                     >
                       {isGeneratingPDF ? '生成中...' : '生成選票(PDF)'}
                     </Button>
@@ -1005,7 +1003,7 @@ apiKey: "AIzaSyAM63c2Fx8FM_BfZNoNlJaOE4PfmU62mKg",
                       placeholder="請牢記此密碼"
                     />
                   </div>
-                  <Button className="w-full py-3 text-lg mt-4 shadow-md" onClick={handleStartVoting}>
+                  <Button className="w-full py-3 text-lg mt-4 shadow-md" onClick={handleStartVoting} disabled={systemState !== 'setup'}>
                     <Icon name="CheckCircle2" className="w-5 h-5 mr-2" /> 正式開始投票
                   </Button>
                 </Card>
@@ -1645,7 +1643,9 @@ apiKey: "AIzaSyAM63c2Fx8FM_BfZNoNlJaOE4PfmU62mKg",
         );
       }
 
-      const displayPolls = polls.filter(p => p.status === 'active' && p.isVisible !== false);
+      const codeObj = voterCodes.find(c => c.code === currentVoterCode);
+      const validPollIds = codeObj?.validPolls;
+      const displayPolls = polls.filter(p => p.status === 'active' && p.isVisible !== false && (!validPollIds || validPollIds.includes(p.id)));
 
       return (
         <div className="max-w-3xl mx-auto space-y-6 pb-20">
