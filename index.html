@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>馬頭涌官立小學 投票系統</title>
+  <title>觀塘官立小學(秀明道) 投票系統</title>
   
   <!-- 載入 Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -311,7 +311,7 @@ apiKey: "AIzaSyAM63c2Fx8FM_BfZNoNlJaOE4PfmU62mKg",
                   <Icon name="CheckCircle2" className="text-white w-4 h-4 sm:w-5 sm:h-5" />
                 </div>
                 <div className="flex flex-col sm:flex-row sm:items-center sm:gap-2 leading-tight">
-                  <span className="font-bold text-[15px] sm:text-xl tracking-tight leading-none">馬頭涌官立小學</span>
+                  <span className="font-bold text-[15px] sm:text-xl tracking-tight leading-none">觀塘官立小學(秀明道)</span>
                   <span className="font-bold text-[15px] sm:text-xl tracking-tight leading-none mt-1 sm:mt-0">投票系統</span>
                 </div>
               </div>
@@ -372,7 +372,7 @@ apiKey: "AIzaSyAM63c2Fx8FM_BfZNoNlJaOE4PfmU62mKg",
               <div className="flex flex-col items-center justify-center h-[60vh] text-center space-y-6">
                 <h2 className="text-4xl font-extrabold text-slate-800 leading-tight">
                   <span className="block pb-4">歡迎使用</span>
-                  <span className="block sm:inline">馬頭涌官立小學</span>
+                  <span className="block sm:inline">觀塘官立小學(秀明道)</span>
                   <span className="block sm:inline sm:ml-2">(投票系統)</span>
                 </h2>
                 <div className="flex gap-4 pt-4">
@@ -391,10 +391,10 @@ apiKey: "AIzaSyAM63c2Fx8FM_BfZNoNlJaOE4PfmU62mKg",
                     e.preventDefault();
                     // 透過數學字元偏移(Shift+3)進行前端混淆驗證，避免密碼明文暴露
                     const obfuscatedInput = adminLoginInput.trim().split('').map(c => String.fromCharCode(c.charCodeAt(0) + 3)).join('');
-                    if (obfuscatedInput === 'Pwf05859') { // 對應管理員密碼
+                    if (obfuscatedInput === 'Vpu05859') { // 對應管理員密碼 Smr-2526
                       setAdminRole('admin');
                       setAdminLoginInput('');
-                    } else if (obfuscatedInput === 'Pwf0593;') { // 對應超級管理員密碼
+                    } else if (obfuscatedInput === 'Vpu0593;') { // 對應超級管理員密碼 Smr-2608
                       setAdminRole('superadmin');
                       setAdminLoginInput('');
                       showToast('已登入為超級管理員', 'success');
@@ -674,7 +674,7 @@ apiKey: "AIzaSyAM63c2Fx8FM_BfZNoNlJaOE4PfmU62mKg",
           
           const opt = {
             margin:       0,
-            filename:     `馬頭涌官立小學-生成選票-${dateStr}.pdf`,
+            filename:     `觀塘官立小學(秀明道)-生成選票-${dateStr}.pdf`,
             image:        { type: 'jpeg', quality: 0.98 },
             html2canvas:  { scale: 2, useCORS: true, scrollY: 0 },
             jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
@@ -995,7 +995,7 @@ apiKey: "AIzaSyAM63c2Fx8FM_BfZNoNlJaOE4PfmU62mKg",
                   </div>
                   
                   <div className="text-center space-y-2">
-                    <h2 className="text-2xl font-extrabold text-slate-800">馬頭涌官立小學</h2>
+                    <h2 className="text-2xl font-extrabold text-slate-800">觀塘官立小學(秀明道)</h2>
                     <div className="text-xl font-bold text-slate-700 flex flex-col items-center gap-1 my-3">
                       {polls.filter(p => p.isVisible !== false).map((p, idx) => (
                         <div key={p.id}>投票({idx + 1}): {p.title}</div>
@@ -1272,7 +1272,7 @@ apiKey: "AIzaSyAM63c2Fx8FM_BfZNoNlJaOE4PfmU62mKg",
                           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', paddingRight: '10mm', paddingTop: '2mm', paddingBottom: '2mm' }}>
                             {/* 上半部：標題與日期 */}
                             <div>
-                              <h2 style={{ fontSize: '18pt', fontWeight: 'bold', margin: '0 0 4px 0', color: '#000' }}>馬頭涌官立小學</h2>
+                              <h2 style={{ fontSize: '18pt', fontWeight: 'bold', margin: '0 0 4px 0', color: '#000' }}>觀塘官立小學(秀明道)</h2>
                               {polls.filter(p => p.isVisible !== false).map((p, i) => (
                                 <div key={i} style={{ fontSize: '12pt', fontWeight: 'bold', margin: '2px 0', color: '#000' }}>
                                   投票主題({i+1})：{p.title.replace(/\(多選\)|（多選）/g, '').trim()}
@@ -1301,7 +1301,7 @@ apiKey: "AIzaSyAM63c2Fx8FM_BfZNoNlJaOE4PfmU62mKg",
                           
                           <div style={{ width: '45mm', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', paddingTop: '2mm', paddingBottom: '2mm' }}>
                             <div style={{ fontSize: '12pt', fontWeight: 'bold', color: '#000', marginBottom: '8px' }}>
-                              S/N: MTC{String(globalIndex + 1).padStart(5, '0')}
+                              S/N: SMR{String(globalIndex + 1).padStart(5, '0')}
                             </div>
                             {/* 校方蓋章 */}
                             <div style={{ 
@@ -1523,7 +1523,7 @@ apiKey: "AIzaSyAM63c2Fx8FM_BfZNoNlJaOE4PfmU62mKg",
         return (
           <div className="flex items-center justify-center min-h-[60vh]">
             <Card className="w-full max-w-md p-8 text-center shadow-xl border-t-4 border-t-blue-600">
-              <h2 className="text-2xl font-extrabold text-black mb-1">馬頭涌官立小學</h2>
+              <h2 className="text-2xl font-extrabold text-black mb-1">觀塘官立小學(秀明道)</h2>
               <h2 className="text-2xl font-extrabold text-black mb-1">投票系統</h2>
               <h3 className="text-lg font-bold text-black mb-4">登入投票網站須進行身份認證</h3>
               <p className="text-slate-600 font-medium mb-8">(請輸入校方提供的6位驗證碼進行投票)</p>
