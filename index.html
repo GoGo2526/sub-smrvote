@@ -215,7 +215,7 @@ apiKey: "AIzaSyAM63c2Fx8FM_BfZNoNlJaOE4PfmU62mKg",
       const [appData, setAppData] = useSyncState();
       const [currentView, setCurrentView] = useState(() => {
         if (typeof window !== 'undefined' && window.location.search.includes('view=voter')) return 'voter';
-        return 'home';
+        return sessionStorage.getItem('currentView') || 'home';
       });
       const [toast, setToast] = useState(null);
       const [currentVoterCode, setCurrentVoterCode] = useState(() => sessionStorage.getItem('currentVoterCode') || null);
@@ -223,7 +223,7 @@ apiKey: "AIzaSyAM63c2Fx8FM_BfZNoNlJaOE4PfmU62mKg",
       const [adminRole, setAdminRole] = useState(() => sessionStorage.getItem('adminRole') || null);
       const [adminLoginInput, setAdminLoginInput] = useState('');
       
-      const [lastLogoutKey, setLastLogoutKey] = useState(appData?.forceLogoutKey);
+      const [lastLogoutKey, setLastLogoutKey] = useState(() => sessionStorage.getItem('lastLogoutKey') || null);
       const [appModal, setAppModal] = useState({ isOpen: false, type: '', title: '', message: '' });
 
       const showToast = (msg, type = 'info') => {
@@ -236,6 +236,10 @@ apiKey: "AIzaSyAM63c2Fx8FM_BfZNoNlJaOE4PfmU62mKg",
       };
 
       useEffect(() => {
+        if (currentView) sessionStorage.setItem('currentView', currentView);
+      }, [currentView]);
+
+      useEffect(() => {
         if (adminRole) sessionStorage.setItem('adminRole', adminRole);
         else sessionStorage.removeItem('adminRole');
       }, [adminRole]);
@@ -246,6 +250,11 @@ apiKey: "AIzaSyAM63c2Fx8FM_BfZNoNlJaOE4PfmU62mKg",
       }, [currentVoterCode]);
 
       useEffect(() => {
+        if (lastLogoutKey) sessionStorage.setItem('lastLogoutKey', lastLogoutKey);
+        else sessionStorage.removeItem('lastLogoutKey');
+      }, [lastLogoutKey]);
+
+      useEffect(() => {
         const handleFirebaseError = (e) => {
           showToast(e.detail || 'Firebase 連線發生錯誤，請檢查設定。', 'error');
         };
@@ -254,13 +263,18 @@ apiKey: "AIzaSyAM63c2Fx8FM_BfZNoNlJaOE4PfmU62mKg",
       }, []);
 
       useEffect(() => {
-        if (appData?.forceLogoutKey && appData.forceLogoutKey !== lastLogoutKey) {
-          if (adminRole === 'admin') {
-            setAdminRole(null);
-            setCurrentView('home');
-            showToast('超級管理員已重設系統並強制登出所有帳戶。', 'error');
+        if (appData?.forceLogoutKey) {
+          const currentForceKey = appData.forceLogoutKey.toString();
+          if (!lastLogoutKey || lastLogoutKey === 'null') {
+            setLastLogoutKey(currentForceKey);
+          } else if (currentForceKey !== lastLogoutKey) {
+            if (adminRole === 'admin') {
+              setAdminRole(null);
+              setCurrentView('home');
+              showToast('超級管理員已重設系統並強制登出所有帳戶。', 'error');
+            }
+            setLastLogoutKey(currentForceKey);
           }
-          setLastLogoutKey(appData.forceLogoutKey);
         }
       }, [appData?.forceLogoutKey, lastLogoutKey, adminRole]);
 
