@@ -29,7 +29,6 @@
 
     // ==========================================
     // [設定區] Firebase 即時資料庫設定
-    // 若要部署到 GitHub Pages 並啟用多裝置「即時更新」，請將您的 Firebase Config 貼在這裡。
     // ==========================================
     const FIREBASE_CONFIG = {
 apiKey: "AIzaSyAM63c2Fx8FM_BfZNoNlJaOE4PfmU62mKg",
@@ -39,7 +38,6 @@ apiKey: "AIzaSyAM63c2Fx8FM_BfZNoNlJaOE4PfmU62mKg",
   messagingSenderId: "581442999958",
   appId: "1:581442999958:web:bbe9e329b74059f6c594b7"
 };
-
 
     // --- 圖示元件 ---
     const Icon = ({ name, className = "w-5 h-5" }) => {
@@ -88,7 +86,7 @@ apiKey: "AIzaSyAM63c2Fx8FM_BfZNoNlJaOE4PfmU62mKg",
 
     const Input = ({ label, type = 'text', value, onChange, onBlur, placeholder, required = false, min, className = '', disabled = false, autoFocus = false }) => (
       <div className={`flex flex-col gap-1.5 w-full ${className}`}>
-        {label && <label className="text-sm font-medium text-slate-700">{label} {required && <span className="text-red-500">*</span>}</label>}
+        {label && <label className="text-sm font-medium text-slate-700">{required && <span className="text-red-500 mr-1">*</span>}{label}</label>}
         <input
           type={type}
           value={value}
@@ -110,10 +108,10 @@ apiKey: "AIzaSyAM63c2Fx8FM_BfZNoNlJaOE4PfmU62mKg",
       startTime: '', 
       endTime: '',
       adminPassword: '',
-      forceLogoutKey: null, // 用於超級管理員強制其他裝置登出的標記
+      forceLogoutKey: null,
       maxOpenPolls: 0, 
       isResultsPublished: false, 
-      actualDistributedCodes: '', // 記錄實際派發的選票數量
+      actualDistributedCodes: '',
       ballotRemark: '請於投票當日登入學校網站,掃描二維碼,並輸入校方提供的6位數密碼進行投票,結果將會在投票截止後隨即公佈.',
       polls: [
         { id: '1', title: '2026年度最佳員工選舉', options: [{ id: 'o1', text: '陳大文' }, { id: 'o2', text: '李小明' }], maxSelect: 1, status: 'active', isVisible: true, isLocked: false },
@@ -212,26 +210,20 @@ apiKey: "AIzaSyAM63c2Fx8FM_BfZNoNlJaOE4PfmU62mKg",
       return [state, setSyncState];
     };
 
-
     // --- 主應用程式 ---
     function App() {
       const [appData, setAppData] = useSyncState();
       const [currentView, setCurrentView] = useState(() => {
-        // 若網址包含 view=voter，則直接進入投票站 (供 QRCode 使用)
         if (typeof window !== 'undefined' && window.location.search.includes('view=voter')) return 'voter';
         return 'home';
       });
       const [toast, setToast] = useState(null);
       const [currentVoterCode, setCurrentVoterCode] = useState(() => sessionStorage.getItem('currentVoterCode') || null);
       
-      // 管理員登入狀態 (null, 'admin', 'superadmin')
       const [adminRole, setAdminRole] = useState(() => sessionStorage.getItem('adminRole') || null);
       const [adminLoginInput, setAdminLoginInput] = useState('');
       
-      // 追蹤上一次的強制登出金鑰
       const [lastLogoutKey, setLastLogoutKey] = useState(appData?.forceLogoutKey);
-
-      // 共用的 Modal (用於首層級別的登出/重設確認)
       const [appModal, setAppModal] = useState({ isOpen: false, type: '', title: '', message: '' });
 
       const showToast = (msg, type = 'info') => {
@@ -243,7 +235,6 @@ apiKey: "AIzaSyAM63c2Fx8FM_BfZNoNlJaOE4PfmU62mKg",
         setAppData({ ...appData, ...updates });
       };
 
-      // 儲存登入狀態至 Session Storage 防止重新整理後登出
       useEffect(() => {
         if (adminRole) sessionStorage.setItem('adminRole', adminRole);
         else sessionStorage.removeItem('adminRole');
@@ -254,7 +245,6 @@ apiKey: "AIzaSyAM63c2Fx8FM_BfZNoNlJaOE4PfmU62mKg",
         else sessionStorage.removeItem('currentVoterCode');
       }, [currentVoterCode]);
 
-      // 監聽 Firebase 權限錯誤並顯示通知
       useEffect(() => {
         const handleFirebaseError = (e) => {
           showToast(e.detail || 'Firebase 連線發生錯誤，請檢查設定。', 'error');
@@ -263,7 +253,6 @@ apiKey: "AIzaSyAM63c2Fx8FM_BfZNoNlJaOE4PfmU62mKg",
         return () => window.removeEventListener('firebase-error', handleFirebaseError);
       }, []);
 
-      // 監聽超級管理員的強制登出訊號
       useEffect(() => {
         if (appData?.forceLogoutKey && appData.forceLogoutKey !== lastLogoutKey) {
           if (adminRole === 'admin') {
@@ -275,7 +264,6 @@ apiKey: "AIzaSyAM63c2Fx8FM_BfZNoNlJaOE4PfmU62mKg",
         }
       }, [appData?.forceLogoutKey, lastLogoutKey, adminRole]);
 
-      // 處理登出點擊
       const handleLogoutClick = () => {
         if (adminRole === 'superadmin') {
           setAppModal({
@@ -389,12 +377,11 @@ apiKey: "AIzaSyAM63c2Fx8FM_BfZNoNlJaOE4PfmU62mKg",
                   <h3 className="text-xl font-bold mb-6 text-slate-800">系統管理員登入</h3>
                   <form onSubmit={(e) => {
                     e.preventDefault();
-                    // 透過數學字元偏移(Shift+3)進行前端混淆驗證，避免密碼明文暴露
                     const obfuscatedInput = adminLoginInput.trim().split('').map(c => String.fromCharCode(c.charCodeAt(0) + 3)).join('');
-                    if (obfuscatedInput === 'Vpu05859') { // 對應管理員密碼 Smr-2526
+                    if (obfuscatedInput === 'Vpu05859') { 
                       setAdminRole('admin');
                       setAdminLoginInput('');
-                    } else if (obfuscatedInput === 'Vpu0593;') { // 對應超級管理員密碼 Smr-2608
+                    } else if (obfuscatedInput === 'Vpu0593;') { 
                       setAdminRole('superadmin');
                       setAdminLoginInput('');
                       showToast('已登入為超級管理員', 'success');
@@ -451,6 +438,7 @@ apiKey: "AIzaSyAM63c2Fx8FM_BfZNoNlJaOE4PfmU62mKg",
     function AdminDashboard({ appData, updateData, showToast, INITIAL_STATE, adminRole, onSuperAdminReset }) {
       const { systemState, polls, voterCodes, startTime, endTime, adminPassword, maxOpenPolls } = appData;
       const [numCodesToGenerate, setNumCodesToGenerate] = useState(10);
+      const [printMode, setPrintMode] = useState('sequential');
       const [activeTab, setActiveTab] = useState('setup');
       const [isUnlocked, setIsUnlocked] = useState(false);
       const [unlockPassword, setUnlockPassword] = useState('');
@@ -479,9 +467,8 @@ apiKey: "AIzaSyAM63c2Fx8FM_BfZNoNlJaOE4PfmU62mKg",
         if (e) e.preventDefault();
         const { type, payload, requirePwd } = modalConfig;
 
-        // 使用數學字元偏移(Shift+3)進行混淆驗證
         const obfuscatedInput = modalInput.trim().split('').map(c => String.fromCharCode(c.charCodeAt(0) + 3)).join('');
-        if (requirePwd && obfuscatedInput !== 'Pwf05859') { // 對應管理員密碼
+        if (requirePwd && obfuscatedInput !== 'Pwf05859') {
           showToast('密碼錯誤！', 'error');
           return;
         }
@@ -579,7 +566,6 @@ apiKey: "AIzaSyAM63c2Fx8FM_BfZNoNlJaOE4PfmU62mKg",
         const newPolls = polls.map(p => p.id === id ? { ...p, status: newStatus } : p);
         
         let updates = { polls: newPolls };
-        // 若重新開放投票主題，且整個系統狀態處於已結束，則同時喚醒系統為開放中
         if (newStatus === 'active' && systemState === 'ended') {
           updates.systemState = 'active';
         }
@@ -650,6 +636,10 @@ apiKey: "AIzaSyAM63c2Fx8FM_BfZNoNlJaOE4PfmU62mKg",
         }
 
         const codesToGen = parseInt(numCodesToGenerate) || 0;
+        if (codesToGen <= 0) {
+          return showToast('請輸入有效的生成選票數量', 'error');
+        }
+
         let currentCodes = voterCodes;
         if (currentCodes.length !== codesToGen) {
           currentCodes = [];
@@ -662,6 +652,7 @@ apiKey: "AIzaSyAM63c2Fx8FM_BfZNoNlJaOE4PfmU62mKg",
         setIsGeneratingPDF(true);
         showToast('正在產生 PDF，請稍候...');
 
+        // 增加延遲確保 React 能夠完成狀態同步及 DOM 渲染
         setTimeout(() => {
           const element = document.getElementById('ballot-pdf-container');
           if (!element) {
@@ -689,18 +680,35 @@ apiKey: "AIzaSyAM63c2Fx8FM_BfZNoNlJaOE4PfmU62mKg",
             setIsGeneratingPDF(false);
             showToast('生成選票發生錯誤，請稍後再試', 'error');
           });
-        }, 800); 
+        }, 1200); 
       };
 
+      // 計算 PDF 頁面分佈
+      const codesWithSN = voterCodes.map((c, i) => ({ ...c, globalIndex: i }));
       const pdfPages = [];
-      for (let i = 0; i < voterCodes.length; i += 4) {
-        pdfPages.push(voterCodes.slice(i, i + 4));
+
+      if (printMode === 'sequential') {
+        for (let i = 0; i < codesWithSN.length; i += 4) {
+          pdfPages.push(codesWithSN.slice(i, i + 4));
+        }
+      } else if (printMode === 'page') {
+        const totalPages = Math.ceil(codesWithSN.length / 4);
+        for (let p = 0; p < totalPages; p++) {
+          const pageItems = [];
+          for (let row = 0; row < 4; row++) {
+            const itemIndex = p + row * totalPages;
+            if (itemIndex < codesWithSN.length) {
+              pageItems.push(codesWithSN[itemIndex]);
+            } else {
+              pageItems.push(null); // 加入空項目維持排版
+            }
+          }
+          pdfPages.push(pageItems);
+        }
       }
 
-      // --- 防弊：計算有效的投票紀錄 ---
       const actualCount = parseInt(appData.actualDistributedCodes) || voterCodes.length;
       const usedCodes = voterCodes.filter(c => c.used);
-      // 以提交時間(usedAt)排列先後次序，若無則排最前
       usedCodes.sort((a, b) => (a.usedAt || 0) - (b.usedAt || 0));
       const excessCount = usedCodes.length - actualCount;
       const validUsedCodes = excessCount > 0 ? usedCodes.slice(0, actualCount) : usedCodes;
@@ -903,21 +911,54 @@ apiKey: "AIzaSyAM63c2Fx8FM_BfZNoNlJaOE4PfmU62mKg",
                     onChange={(e) => updateData({ endTime: e.target.value })}
                   />
                   
-                  <div className="flex flex-col sm:flex-row gap-3 sm:items-end w-full">
-                    <Input 
-                      type="number" 
-                      label="生成 6 位數密碼數量" 
-                      min="1"
-                      required
-                      value={numCodesToGenerate}
-                      onChange={(e) => setNumCodesToGenerate(e.target.value)}
-                      placeholder="人數"
-                      className="w-[40%] sm:flex-1"
-                    />
-                    <Button variant="secondary" onClick={handleGenerateBallotsPDF} className="w-full sm:w-auto shrink-0 h-[42px] px-4 whitespace-nowrap text-sm font-medium mt-1 sm:mt-0" disabled={isGeneratingPDF}>
+                  {/* ====== 修改：生成 6 位數密碼數量 (分為四列排版，並改用 mutually exclusive 的 checkbox) ====== */}
+                  <div className="flex flex-col gap-3 w-full border-t border-slate-100 pt-4 mt-2">
+                    <div className="flex flex-col gap-1.5 w-full">
+                      <label className="text-sm font-medium text-slate-700">
+                        <span className="text-red-500 mr-1">*</span>生成 6 位數密碼數量
+                      </label>
+                      <input 
+                        type="number" 
+                        min="1"
+                        required
+                        value={numCodesToGenerate}
+                        onChange={(e) => setNumCodesToGenerate(e.target.value)}
+                        placeholder="人數"
+                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow appearance-none bg-white"
+                      />
+                    </div>
+                    
+                    <div className="flex items-center gap-6 py-1">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input 
+                          type="checkbox" 
+                          checked={printMode === 'sequential'} 
+                          onChange={() => setPrintMode('sequential')} 
+                          className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 cursor-pointer"
+                        />
+                        <span className="text-sm font-medium text-slate-700">順序</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input 
+                          type="checkbox" 
+                          checked={printMode === 'page'} 
+                          onChange={() => setPrintMode('page')} 
+                          className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 cursor-pointer"
+                        />
+                        <span className="text-sm font-medium text-slate-700">頁面</span>
+                      </label>
+                    </div>
+                    
+                    <Button 
+                      variant="secondary" 
+                      onClick={handleGenerateBallotsPDF} 
+                      className="w-full py-2.5 text-sm font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-300" 
+                      disabled={isGeneratingPDF}
+                    >
                       {isGeneratingPDF ? '生成中...' : '生成選票(PDF)'}
                     </Button>
                   </div>
+                  {/* ====== 結束修改 ====== */}
 
                   <Input 
                     type="number" 
@@ -1257,7 +1298,21 @@ apiKey: "AIzaSyAM63c2Fx8FM_BfZNoNlJaOE4PfmU62mKg",
                     display: 'block' 
                   }}>
                     {pageCodes.map((c, idx) => {
-                      const globalIndex = pageIndex * 4 + idx;
+                      if (!c) {
+                        return (
+                          <div key={`blank-${idx}`} style={{ 
+                            height: '70mm', 
+                            padding: '4mm 0', 
+                            boxSizing: 'border-box',
+                            borderBottom: idx !== 3 ? '1px dashed #999' : 'none',
+                            display: 'flex',
+                            justifyContent: 'center',
+                            alignItems: 'center'
+                          }}>
+                            &nbsp;
+                          </div>
+                        );
+                      }
                       return (
                         <div key={idx} style={{ 
                           height: '70mm', 
@@ -1270,7 +1325,6 @@ apiKey: "AIzaSyAM63c2Fx8FM_BfZNoNlJaOE4PfmU62mKg",
                           pageBreakInside: 'avoid'
                         }}>
                           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', paddingRight: '10mm', paddingTop: '2mm', paddingBottom: '2mm' }}>
-                            {/* 上半部：標題與日期 */}
                             <div>
                               <h2 style={{ fontSize: '18pt', fontWeight: 'bold', margin: '0 0 4px 0', color: '#000' }}>觀塘官立小學(秀明道)</h2>
                               {polls.filter(p => p.isVisible !== false).map((p, i) => (
@@ -1283,14 +1337,12 @@ apiKey: "AIzaSyAM63c2Fx8FM_BfZNoNlJaOE4PfmU62mKg",
                               </div>
                             </div>
                             
-                            {/* 中間部：放大並置中的密碼 */}
                             <div style={{ flex: 1, display: 'flex', alignItems: 'center' }}>
                               <div style={{ fontSize: '24pt', fontWeight: 'bold', color: '#000' }}>
                                 生成的6位數密碼：<span style={{ color: '#0000FF' }}>{c.code}</span>
                               </div>
                             </div>
 
-                            {/* 下半部：備註 (使用 flex 確保第二列文字與第一列對齊) */}
                             <div>
                               <div style={{ fontSize: '9pt', fontWeight: 'bold', color: '#000', lineHeight: '1.4', display: 'flex' }}>
                                 <span style={{ whiteSpace: 'nowrap' }}>備註：</span>
@@ -1301,9 +1353,8 @@ apiKey: "AIzaSyAM63c2Fx8FM_BfZNoNlJaOE4PfmU62mKg",
                           
                           <div style={{ width: '45mm', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', paddingTop: '2mm', paddingBottom: '2mm' }}>
                             <div style={{ fontSize: '12pt', fontWeight: 'bold', color: '#000', marginBottom: '8px' }}>
-                              S/N: SMR{String(globalIndex + 1).padStart(5, '0')}
+                              S/N: SMR{String(c.globalIndex + 1).padStart(5, '0')}
                             </div>
-                            {/* 校方蓋章 */}
                             <div style={{ 
                               width: '45mm', 
                               height: '45mm', 
@@ -1402,20 +1453,15 @@ apiKey: "AIzaSyAM63c2Fx8FM_BfZNoNlJaOE4PfmU62mKg",
           const currentSelected = prev[pollId] || [];
           
           if (currentSelected.includes(optionId)) {
-            // 無論單選或多選，已勾選再次點擊即取消選取 (Toggle Off)
             return { ...prev, [pollId]: currentSelected.filter(id => id !== optionId) };
           } else {
-            // 單選模式下點擊新項目，直接取代舊項目
             if (maxSelect === 1) {
               return { ...prev, [pollId]: [optionId] };
             }
-            
-            // 多選模式下，若已達上限則阻擋
             if (currentSelected.length >= maxSelect) {
               showToast(`此主題最多只能選擇 ${maxSelect} 項`, 'error');
               return prev;
             }
-            
             return { ...prev, [pollId]: [...currentSelected, optionId] };
           }
         });
@@ -1438,7 +1484,6 @@ apiKey: "AIzaSyAM63c2Fx8FM_BfZNoNlJaOE4PfmU62mKg",
         setInputCode('');
       };
 
-      // --- 若已公佈結果，公眾介面強制顯示最終報告 ---
       if (isResultsPublished) {
         const actualCount = parseInt(appData.actualDistributedCodes) || voterCodes.length;
         const usedCodes = voterCodes.filter(c => c.used);
@@ -1501,7 +1546,6 @@ apiKey: "AIzaSyAM63c2Fx8FM_BfZNoNlJaOE4PfmU62mKg",
         );
       }
 
-      // --- 若投票已結束但未公佈結果，顯示無法投票提示 (票站掃描進入時的攔截) ---
       if (systemState === 'ended' || timeStatus === 'ended') {
         return (
           <div className="flex items-center justify-center min-h-[60vh]">
@@ -1587,7 +1631,6 @@ apiKey: "AIzaSyAM63c2Fx8FM_BfZNoNlJaOE4PfmU62mKg",
         );
       }
 
-      // 取得可顯示的投票項目 (過濾掉設定為隱藏的主題)
       const displayPolls = polls.filter(p => p.status === 'active' && p.isVisible !== false);
 
       return (
