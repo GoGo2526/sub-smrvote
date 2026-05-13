@@ -1738,7 +1738,18 @@ apiKey: "AIzaSyAM63c2Fx8FM_BfZNoNlJaOE4PfmU62mKg",
               <Button variant="outline" onClick={handleLogout} className="text-slate-500 border-slate-200">
                 取消並登出
               </Button>
-              <Button onClick={() => setShowConfirmModal(true)} className="px-8 py-3 text-lg shadow-lg hover:-translate-y-0.5 transition-transform" disabled={timeStatus === 'ended' || displayPolls.length === 0}>
+              <Button onClick={() => {
+                const incompletePolls = displayPolls.filter(p => !selections[p.id] || selections[p.id].length === 0);
+                if (incompletePolls.length > 0) {
+                  if (displayPolls.length > 1) {
+                    showToast('請確認已經填妥及完成所有投票主題！', 'error');
+                  } else {
+                    showToast('請最少選擇一個選項！', 'error');
+                  }
+                  return;
+                }
+                setShowConfirmModal(true);
+              }} className="px-8 py-3 text-lg shadow-lg hover:-translate-y-0.5 transition-transform" disabled={timeStatus === 'ended' || displayPolls.length === 0}>
                 確認送出選票 <Icon name="CheckCircle2" className="w-5 h-5 ml-2" />
               </Button>
             </div>
