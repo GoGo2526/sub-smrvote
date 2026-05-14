@@ -724,11 +724,12 @@ apiKey: "AIzaSyAM63c2Fx8FM_BfZNoNlJaOE4PfmU62mKg",
 
       // 計算動態字型大小，避免主題過多時選票排版移位
       const visiblePollsCount = polls.filter(p => p.isVisible !== false).length;
-      const pdfSchoolNameSize = visiblePollsCount >= 6 ? '14pt' : '18pt';
-      const pdfPollTitleSize = visiblePollsCount >= 8 ? '8pt' : (visiblePollsCount >= 4 ? '9.5pt' : '12pt');
-      const pdfPollTitleMargin = visiblePollsCount >= 6 ? '0px 0' : '2px 0';
-      const pdfDateSize = visiblePollsCount >= 6 ? '9pt' : '11pt';
-      const pdfPasswordSize = visiblePollsCount >= 6 ? '16pt' : (visiblePollsCount >= 4 ? '20pt' : '24pt');
+      const pdfSchoolNameSize = visiblePollsCount > 4 ? '14pt' : '18pt';
+      const pdfPollTitleSize = visiblePollsCount > 4 ? '8.5pt' : '12pt';
+      const pdfPollTitleMargin = visiblePollsCount > 4 ? '0px 0' : '2px 0';
+      const pdfDateSize = visiblePollsCount > 4 ? '8.5pt' : '11pt';
+      const pdfPasswordSize = visiblePollsCount > 4 ? '15pt' : '24pt';
+      const pdfPaddingY = visiblePollsCount > 4 ? '2mm' : '4mm'; // 動態調整 padding 讓出更多空間
 
       return (
         <div className="space-y-6">
@@ -1322,7 +1323,7 @@ apiKey: "AIzaSyAM63c2Fx8FM_BfZNoNlJaOE4PfmU62mKg",
                         return (
                           <div key={`blank-${idx}`} style={{ 
                             height: '70mm', 
-                            padding: '4mm 0', 
+                            padding: `${pdfPaddingY} 0`, 
                             boxSizing: 'border-box',
                             borderBottom: idx !== 3 ? '1px dashed #999' : 'none',
                             display: 'flex',
@@ -1336,28 +1337,29 @@ apiKey: "AIzaSyAM63c2Fx8FM_BfZNoNlJaOE4PfmU62mKg",
                       return (
                         <div key={idx} style={{ 
                           height: '70mm', 
-                          padding: '4mm 0', 
+                          padding: `${pdfPaddingY} 0`, 
                           boxSizing: 'border-box',
                           borderBottom: idx !== 3 ? '1px dashed #999' : 'none',
                           display: 'flex',
                           justifyContent: 'space-between',
+                          alignItems: 'center',
                           fontFamily: '"Microsoft JhengHei", "PingFang TC", sans-serif',
                           pageBreakInside: 'avoid'
                         }}>
-                          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', paddingRight: '10mm', paddingTop: '2mm', paddingBottom: '2mm' }}>
+                          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', paddingRight: '10mm' }}>
                             <div>
                               <h2 style={{ fontSize: pdfSchoolNameSize, fontWeight: 'bold', margin: '0 0 4px 0', color: '#000' }}>觀塘官立小學(秀明道)</h2>
                               {polls.filter(p => p.isVisible !== false).map((p, i) => (
-                                <div key={i} style={{ fontSize: pdfPollTitleSize, fontWeight: 'bold', margin: pdfPollTitleMargin, color: '#000' }}>
+                                <div key={i} style={{ fontSize: pdfPollTitleSize, fontWeight: 'bold', margin: pdfPollTitleMargin, color: '#000', lineHeight: visiblePollsCount > 4 ? '1.1' : '1.4' }}>
                                   投票主題({i+1})：{p.title.replace(/\(多選\)|（多選）/g, '').trim()}
                                 </div>
                               ))}
-                              <div style={{ fontSize: pdfDateSize, fontWeight: 'bold', margin: '4px 0 0 0', color: '#000' }}>
+                              <div style={{ fontSize: pdfDateSize, fontWeight: 'bold', margin: visiblePollsCount > 4 ? '2px 0 0 0' : '4px 0 0 0', color: '#000' }}>
                                 投票日期：{formatTime(startTime)} 至 {formatTime(endTime)}
                               </div>
                             </div>
                             
-                            <div style={{ flex: 1, display: 'flex', alignItems: 'center' }}>
+                            <div style={{ margin: visiblePollsCount > 4 ? '6px 0' : '12px 0' }}>
                               <div style={{ fontSize: pdfPasswordSize, fontWeight: 'bold', color: '#000' }}>
                                 生成的6位數密碼：<span style={{ color: '#0000FF' }}>{c.code}</span>
                               </div>
