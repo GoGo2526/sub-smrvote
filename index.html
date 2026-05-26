@@ -200,13 +200,15 @@ apiKey: "AIzaSyAM63c2Fx8FM_BfZNoNlJaOE4PfmU62mKg",
       const setSyncState = (newState) => {
         setState(newState);
         if (dbRef) {
-          dbRef.set(newState, { merge: true }).catch(err => {
+          return dbRef.set(newState, { merge: true }).catch(err => {
              console.error("Update failed:", err);
              if (err.code === 'permission-denied') {
                 window.dispatchEvent(new CustomEvent('firebase-error', { detail: '儲存失敗：Firestore 權限不足，請檢查您的資料庫安全性規則。' }));
              }
+             throw err;
           });
         }
+        return Promise.resolve();
       };
 
       return [state, setSyncState];
@@ -234,7 +236,7 @@ apiKey: "AIzaSyAM63c2Fx8FM_BfZNoNlJaOE4PfmU62mKg",
       };
 
       const updateData = (updates) => {
-        setAppData({ ...appData, ...updates });
+        return setAppData({ ...appData, ...updates });
       };
 
       useEffect(() => {
@@ -1506,6 +1508,7 @@ apiKey: "AIzaSyAM63c2Fx8FM_BfZNoNlJaOE4PfmU62mKg",
       const [timeLeft, setTimeLeft] = useState(null);
       const [selections, setSelections] = useState({});
       const [showConfirmModal, setShowConfirmModal] = useState(false);
+      const [isSubmitting, setIsSubmitting] = useState(false);
 
       useEffect(() => {
         if (systemState !== 'active' || !endTime || !startTime) return;
@@ -1582,7 +1585,8 @@ apiKey: "AIzaSyAM63c2Fx8FM_BfZNoNlJaOE4PfmU62mKg",
         });
       };
 
-      const handleSubmitVote = () => {
+      const handleSubmitVote = async () => {
+        setIsSubmitting(true);
         const newVoterCodes = voterCodes.map(c => {
           if (c.code === currentVoterCode) {
             return { ...c, used: true, usedAt: Date.now(), votes: selections };
@@ -1590,8 +1594,15 @@ apiKey: "AIzaSyAM63c2Fx8FM_BfZNoNlJaOE4PfmU62mKg",
           return c;
         });
         
-        updateData({ voterCodes: newVoterCodes });
-        setCurrentVoterCode('SUBMITTED_SUCCESS');
+        try {
+          await updateData({ voterCodes: newVoterCodes });
+          setShowConfirmModal(false);
+          setCurrentVoterCode('SUBMITTED_SUCCESS');
+        } catch (error) {
+          showToast('系統繁忙或連線中斷，無法寫入選票，請重試！', 'error');
+        } finally {
+          setIsSubmitting(false);
+        }
       };
 
       const handleLogout = () => {
@@ -1864,11 +1875,10 @@ apiKey: "AIzaSyAM63c2Fx8FM_BfZNoNlJaOE4PfmU62mKg",
                 <h3 className="text-xl font-bold mb-2">提示訊息</h3>
                 <p className="text-slate-600 mb-6 text-sm">請確認選票,經確認後選項將不能更改,敬請留意!</p>
                 <div className="flex gap-3 justify-end mt-6">
-                  <Button variant="secondary" onClick={() => setShowConfirmModal(false)}>取消</Button>
-                  <Button variant="primary" onClick={() => {
-                    setShowConfirmModal(false);
-                    handleSubmitVote();
-                  }}>確認</Button>
+                  <Button variant="secondary" onClick={() => setShowConfirmModal(false)} disabled={isSubmitting}>取消</Button>
+                  <Button variant="primary" onClick={handleSubmitVote} disabled={isSubmitting}>
+                    {isSubmitting ? '處理中...' : '確認'}
+                  </Button>
                 </div>
               </div>
             </div>
