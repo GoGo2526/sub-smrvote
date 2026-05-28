@@ -466,6 +466,12 @@
       const [modalInput, setModalInput] = useState('');
       const fileInputRef = useRef(null);
 
+      // 重新開放功能專用狀態
+      const [reopenPollId, setReopenPollId] = useState(null);
+      const [showReopenConfirm, setShowReopenConfirm] = useState(false);
+      const [showNewEndTimeInput, setShowNewEndTimeInput] = useState(false);
+      const [newEndTime, setNewEndTime] = useState('');
+
       useEffect(() => {
         if (systemState === 'active') setActiveTab('active');
         if (systemState === 'ended') setActiveTab('results');
@@ -563,6 +569,12 @@
         }
 
         if (!startTime || !endTime) return showToast('請設定投票開始與截止時間。', 'error');
+        
+        // 開始與截止時間順序檢測
+        if (new Date(endTime).getTime() <= new Date(startTime).getTime()) {
+          return showToast('投票截止時間不能早於或等於開始時間！', 'error');
+        }
+
         if (!appData.actualDistributedCodes || parseInt(appData.actualDistributedCodes) <= 0) return showToast('請填寫實際派發選票數量。', 'error');
         if (!adminPassword) return showToast('請設定解鎖結果用的密碼。', 'error');
         
@@ -609,11 +621,19 @@
       };
 
       const handleTogglePollStatus = (id) => {
-        const isTimeEnded = endTime && new Date().getTime() > new Date(endTime).getTime();
-        if (isTimeEnded) {
-          return showToast('投票時間已結束，不能更改狀態。', 'error');
-        }
         const targetPoll = polls.find(p => p.id === id);
+        const isTimeEnded = endTime && new Date().getTime() > new Date(endTime).getTime();
+        const currentDisplayStatus = (targetPoll.status === 'active' && !isTimeEnded) ? 'active' : 'ended';
+
+        // 重新開放邏輯修訂：如果當前狀態為结束/暫停，且系統總時間已過截止時間
+        if (currentDisplayStatus === 'ended') {
+          if (isTimeEnded) {
+            setReopenPollId(id);
+            setShowReopenConfirm(true); // 觸發「投票時間結束，不能更改狀態。」對話框
+            return;
+          }
+        }
+
         const newStatus = targetPoll.status === 'active' ? 'ended' : 'active';
         const newPolls = polls.map(p => p.id === id ? { ...p, status: newStatus } : p);
         
@@ -756,6 +776,11 @@
         const codesToGen = parseInt(numCodesToGenerate) || 0;
         if (codesToGen <= 0) {
           return showToast('請輸入有效的生成選票數量', 'error');
+        }
+
+        // 開始與截止時間順序檢測
+        if (new Date(endTime).getTime() <= new Date(startTime).getTime()) {
+          return showToast('投票截止時間不能早於或等於開始時間！', 'error');
         }
 
         const validPollIds = visiblePolls.map(p => p.id);
@@ -1060,7 +1085,13 @@
                     disabled={systemState !== 'setup'}
                     value={startTime}
                     className="w-full"
-                    onChange={(e) => updateData({ startTime: e.target.value })}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      updateData({ startTime: val });
+                      if (endTime && val && new Date(endTime).getTime() <= new Date(val).getTime()) {
+                        showToast('投票截止時間不能早於或等於開始時間！', 'error');
+                      }
+                    }}
                   />
                   <Input 
                     type="datetime-local" 
@@ -1069,7 +1100,13 @@
                     disabled={systemState !== 'setup'}
                     value={endTime}
                     className="w-full"
-                    onChange={(e) => updateData({ endTime: e.target.value })}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      updateData({ endTime: val });
+                      if (startTime && val && new Date(val).getTime() <= new Date(startTime).getTime()) {
+                        showToast('投票截止時間不能早於或等於開始時間！', 'error');
+                      }
+                    }}
                   />
                   
                   {/* ====== 生成 6 位數密碼數量 ====== */}
@@ -1257,7 +1294,7 @@
 
                 <Card className="p-6">
                   <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-xl font-bold text-slate-800">投票主題管理</h3>
+                    <h3 className="text-xl font-bold text-slate-800">投票主題 management</h3>
                     <div className="flex gap-2">
                       <Button variant="outline" className="text-xs px-2 py-1 h-8" onClick={handleEndAllPolls}>全部結束</Button>
                       <Button variant="danger" className="text-xs px-2 py-1 h-8" onClick={handleResetAllPolls}>全部重設</Button>
@@ -1481,6 +1518,72 @@
                     <Button variant={modalConfig.requirePwd ? "primary" : "danger"} type="submit">確認</Button>
                   </div>
                 </form>
+              </div>
+            </div>
+          )}
+
+          {/* 重新開放提示 Modal 1: 提示時間結束不能更改，確認重新開放與取消 */}
+          {showReopenConfirm && (
+            <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm print:hidden">
+              <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm m-4 animate-in fade-in zoom-in-95">
+                <h3 className="text-xl font-bold mb-2">提示訊息</h3>
+                <p className="text-slate-600 mb-6 text-sm">投票時間結束，不能更改狀態。</p>
+                <div className="flex gap-3 justify-end mt-6">
+                  <Button variant="secondary" onClick={() => { setShowReopenConfirm(false); setReopenPollId(null); }} type="button">取消</Button>
+                  <Button variant="primary" onClick={() => { setShowReopenConfirm(false); setShowNewEndTimeInput(true); }} type="button">確認重新開放</Button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 重新開放提示 Modal 2: 選擇新的截止時間 */}
+          {showNewEndTimeInput && (
+            <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm print:hidden">
+              <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm m-4 animate-in fade-in zoom-in-95">
+                <h3 className="text-xl font-bold mb-2">更新截止時間</h3>
+                <div className="space-y-4">
+                  <Input
+                    type="datetime-local"
+                    label="更新後的截止時間"
+                    value={newEndTime}
+                    onChange={(e) => setNewEndTime(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="flex gap-3 justify-end mt-6">
+                  <Button variant="secondary" onClick={() => { setShowNewEndTimeInput(false); setReopenPollId(null); setNewEndTime(''); }} type="button">取消</Button>
+                  <Button variant="primary" onClick={() => {
+                    if (!newEndTime) {
+                      showToast('請選擇更新後的截止時間！', 'error');
+                      return;
+                    }
+                    const now = new Date().getTime();
+                    const start = startTime ? new Date(startTime).getTime() : 0;
+                    const end = new Date(newEndTime).getTime();
+                    
+                    if (end <= now) {
+                      showToast('更新後的截止時間必須晚於目前時間！', 'error');
+                      return;
+                    }
+                    if (end <= start) {
+                      showToast('截止時間不能早於或等於開始時間！', 'error');
+                      return;
+                    }
+
+                    // 更新截止時間與主題狀態
+                    const newPolls = polls.map(p => p.id === reopenPollId ? { ...p, status: 'active' } : p);
+                    updateData({
+                      endTime: newEndTime,
+                      systemState: 'active',
+                      polls: newPolls
+                    });
+                    
+                    setShowNewEndTimeInput(false);
+                    setReopenPollId(null);
+                    setNewEndTime('');
+                    showToast('投票已成功重新開放，截止時間已更新！', 'success');
+                  }} type="button">確認</Button>
+                </div>
               </div>
             </div>
           )}
