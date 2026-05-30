@@ -1787,16 +1787,40 @@
           .substring(0, 6);
         const generatedReceipt = `SMR-REC-${currentVoterCode}-${timestamp.toString().slice(-4)}-${selectionSig}`.toUpperCase();
 
-        const newVoterCodes = voterCodes.map(c => {
-          if (c.code === currentVoterCode) {
-            return { ...c, used: true, usedAt: timestamp, votes: selections, receipt: generatedReceipt };
-          }
-          return c;
-        });
-        
         try {
-          // 強制進行即時資料庫雙重握手寫入，若未成功不予跳頁
-          await updateData({ voterCodes: newVoterCodes });
+          // 改用 Firestore Transaction (事務) 處理，解決多人同時投票時數據互相覆蓋的問題
+          const db = firebase.firestore();
+          const appId = typeof __app_id !== 'undefined' ? __app_id : 'mty-voting-app';
+          const docRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('votes').doc('main_state');
+
+          await db.runTransaction(async (transaction) => {
+            const doc = await transaction.get(docRef);
+            if (!doc.exists) {
+              throw new Error("系統資料庫無法存取！");
+            }
+            const data = doc.data();
+            const serverVoterCodes = data.voterCodes || [];
+            
+            const codeIndex = serverVoterCodes.findIndex(c => c.code === currentVoterCode);
+            if (codeIndex === -1) {
+              throw new Error("無效的通行碼！");
+            }
+            if (serverVoterCodes[codeIndex].used) {
+              throw new Error("此通行碼已經完成投票，請勿重複提交！");
+            }
+
+            // 在伺服器最新數據上更新該選票狀態，確保不會覆蓋到別人的選票
+            serverVoterCodes[codeIndex] = {
+              ...serverVoterCodes[codeIndex],
+              used: true,
+              usedAt: timestamp,
+              votes: selections,
+              receipt: generatedReceipt
+            };
+
+            // 將更新後的數據安全寫回
+            transaction.update(docRef, { voterCodes: serverVoterCodes });
+          });
           
           // 儲存於本地以供成功畫面查驗，避免頁面重整後收據消失
           sessionStorage.setItem('votedReceipt', generatedReceipt);
@@ -1805,7 +1829,8 @@
           setShowConfirmModal(false);
           setCurrentVoterCode('SUBMITTED_SUCCESS');
         } catch (error) {
-          showToast('系統繁忙或連線中斷，無法寫入選票，請重試！', 'error');
+          console.error("Vote Transaction Failed: ", error);
+          showToast(error.message || '系統繁忙或連線中斷，無法寫入選票，請重試！', 'error');
         } finally {
           setIsSubmitting(false);
         }
