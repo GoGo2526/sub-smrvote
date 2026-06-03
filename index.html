@@ -176,9 +176,15 @@
         const unsubscribe = ref.onSnapshot(
           doc => {
             if (doc.exists) {
-              setState(doc.data());
+              // 核心修正 1：安全合併，避免任何客戶端本地舊快照或空欄位覆蓋伺服器上的寶貴數據
+              const serverData = doc.data();
+              setState(prevState => {
+                // 如果本地已經在進行投票流程，不應隨便重設本地
+                return { ...prevState, ...serverData };
+              });
             } else {
-              ref.set(INITIAL_STATE).catch(err => {
+              // 核心修正 2：資料庫無數據時，僅嘗試以「無損合併」方式寫入，不允許在運行中隨意重置
+              ref.set(INITIAL_STATE, { merge: true }).catch(err => {
                 console.error("Initial set failed:", err);
                 if (err.code === 'permission-denied') {
                   window.dispatchEvent(new CustomEvent('firebase-error', { detail: 'Firestore 權限遭拒：請進入 Firebase 控制台，將資料庫規則 (Rules) 改為測試模式 (allow read, write: if true)。' }));
@@ -198,16 +204,19 @@
       }, [user]);
 
       const setSyncState = (newState) => {
-        setState(newState);
-        if (dbRef) {
-          return dbRef.set(newState, { merge: true }).catch(err => {
-             console.error("Update failed:", err);
-             if (err.code === 'permission-denied') {
-                window.dispatchEvent(new CustomEvent('firebase-error', { detail: '儲存失敗：Firestore 權限不足，請檢查您的資料庫安全性規則。' }));
-             }
-             throw err;
-          });
-        }
+        // 核心修正 3：狀態更新時採用 React 函式狀態更新，避免競態
+        setState(prev => {
+          const merged = typeof newState === 'function' ? newState(prev) : { ...prev, ...newState };
+          if (dbRef) {
+            dbRef.set(merged, { merge: true }).catch(err => {
+               console.error("Update failed:", err);
+               if (err.code === 'permission-denied') {
+                  window.dispatchEvent(new CustomEvent('firebase-error', { detail: '儲存失敗：Firestore 權限不足，請檢查您的資料庫安全性規則。' }));
+               }
+            });
+          }
+          return merged;
+        });
         return Promise.resolve();
       };
 
@@ -236,7 +245,10 @@
       };
 
       const updateData = (updates) => {
-        return setAppData({ ...appData, ...updates });
+        return setAppData(prev => {
+          const nextData = typeof updates === 'function' ? updates(prev) : { ...prev, ...updates };
+          return nextData;
+        });
       };
 
       useEffect(() => {
@@ -351,7 +363,7 @@
 
           {toast && (
             <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[100] animate-in fade-in slide-in-from-top-4 print:hidden">
-              <div className={`px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 text-white font-medium ${toast.type === 'error' ? 'bg-red-600' : 'bg-slate-880 bg-slate-900'}`}>
+              <div className={`px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 text-white font-medium ${toast.type === 'error' ? 'bg-red-600' : 'bg-slate-900'}`}>
                 <Icon name={toast.type === 'error' ? 'AlertCircle' : 'CheckCircle2'} className="w-5 h-5" />
                 {toast.msg}
               </div>
@@ -500,6 +512,7 @@
         if (type === 'superReset') {
           onSuperAdminReset();
         } else if (type === 'resetSystem') {
+          // 核心修正 4：重置時安全重置，避免寫入空文檔
           updateData(INITIAL_STATE);
           showToast('系統已完全重新設定。', 'success');
         } else if (type === 'unlockPoll') {
@@ -512,7 +525,7 @@
         } else if (type === 'resetAllPolls') {
           const newCodes = voterCodes.map(c => ({ ...c, used: false, votes: {}, usedAt: null, receipt: null }));
           const newPolls = polls.map(p => ({ ...p, status: 'active' }));
-          updateData({ voterCodes: newCodes, polls: newPolls });
+          updateData({ voterCodes: newCodes, polls: newPolls, isResultsPublished: false });
           showToast('已清除並重設所有投票數據');
         } else if (type === 'importCSV') {
           if (fileInputRef.current) {
