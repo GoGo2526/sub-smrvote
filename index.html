@@ -675,7 +675,7 @@
 
       const handleEndAllPolls = () => {
         const newPolls = polls.map(p => ({ ...p, status: 'ended' }));
-        updateData({ polls: newPolls });
+        updateData({ systemState: 'ended', polls: newPolls });
         showToast('已結束所有投票主題');
       };
 
